@@ -1,0 +1,88 @@
+# Multi-Chain Transaction Exporter - Implementation Plan (React Refactor)
+
+Refactoring to a modern React + Tailwind stack to improved UI, add advanced features, and fix API integration bugs.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **Refactor Notice**
+> The project is being migrated from Vanilla JS to **React + Tailwind CSS** to support better UI components and state management.
+
+> [!WARNING]
+> **Fuel API Broken**
+> The `OutputCoin` type is invalid. Will verify schema via introspection during implementation. Likely changed to `CoinOutput` or managed via `outputs` generic list.
+
+> [!CAUTION]
+> **Data Availability Issue**
+> The Fuel Mainnet endpoint is returning **empty data** for addresses provided by the user, despite user claims of history. Debugging focuses on validating Chain ID, endpoint, and query structure (e.g., `transactionsByOwner` vs `coins`).
+
+---
+
+## Proposed Changes
+
+### Core Architecture
+
+```mermaid
+graph TD
+    A[App] --> B[Layout]
+    B --> C[NetworkSelector]
+    B --> D[AddressInput]
+    B --> E[TransactionDataTable]
+    E --> F[Sorting/Selection Logic]
+    E --> G[Export Actions]
+    D --> H[Fuel Adapter]
+    D --> I[Creditcoin Adapter]
+    H --> J[Unified Parser]
+    I --> J
+```
+
+### Technology Stack
+- **Framework**: React 18 + Vite
+- **Styling**: TailwindCSS
+- **Utils**: `clsx`, `tailwind-merge` (for shadcn-like merging)
+- **Icons**: `lucide-react`
+
+### Feature Additions
+- **Enhanced Table**:
+  - Sortable columns (Date, Type, Status)
+  - Row selection (checkboxes) for export
+  - Status badges (Success/Failed)
+  - Detailed Notes with Tx Link
+  - Action Type column
+- **Export Options**: "Export All" vs "Export Selected"
+
+### Bug Fixes
+- **Fuel**: Fix `Unknown type "OutputCoin"` error (Update GraphQL Query).
+- **Creditcoin**: Fix negative zero display (`-0` -> `0`).
+
+---
+
+### File Structure Changes
+
+#### [NEW] [src/App.tsx](file:///e:/Building/awaken_connect/src/App.tsx)
+- Main application state (transactions, selection, network).
+
+#### [NEW] [src/components/ui/*.tsx](file:///e:/Building/awaken_connect/src/components/ui/button.tsx)
+- Reusable UI components (Button, Input, Table, Card, Select) matching "shadcn" aesthetic.
+
+#### [NEW] [src/components/TransactionTable.tsx](file:///e:/Building/awaken_connect/src/components/TransactionTable.tsx)
+- React component with sorting, selection, and pagination.
+
+#### [NEW] [src/adapters/fuel.ts](file:///e:/Building/awaken_connect/src/adapters/fuel.ts)
+- Updated GraphQL query.
+- **Validation**: Will run schema introspection to confirm types.
+
+---
+
+## Verification Plan
+
+### Automated Testing
+- [ ] Run `npm run build` to verify React/TS compilation.
+
+### Manual Verification
+1. **Fuel Backtest**: Test with provided address `0x132...6b8fc`.
+2. **Creditcoin**: Verify swaps show `0` instead of `-0`.
+3. **UI Check**: Confirm "shadcn-like" look and feel (clean, modern, dark mode).
+4. **Export**: Verify "Selected Only" export works correctly.
