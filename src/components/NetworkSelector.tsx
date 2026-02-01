@@ -46,7 +46,7 @@ export function NetworkSelector({ selected, onSelect, disabled }: NetworkSelecto
                     </div>
                     <div>
                         <h3 className="font-semibold">Humanity Protocol</h3>
-                        <p className="text-xs text-muted-foreground">Mainnet</p>
+                        <p className="text-xs text-muted-foreground">Via Alchemy</p>
                     </div>
                 </div>
             </Card>

@@ -6,7 +6,7 @@ export function Footer() {
             <div className="flex flex-col items-center justify-center space-y-4">
                 <div className="flex items-center space-x-6">
                     <a
-                        href="https://github.com/yourusername/awaken-connect"
+                        href="https://github.com/starrftw/awaken-connect"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-muted-foreground hover:text-foreground transition-colors duration-200"
@@ -15,7 +15,7 @@ export function Footer() {
                         <Github className="h-6 w-6" />
                     </a>
                     <a
-                        href="https://x.com/yourhandle"
+                        href="https://x.com/starrftw"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-muted-foreground hover:text-foreground transition-colors duration-200"

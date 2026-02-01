@@ -6,7 +6,7 @@ A multi-chain transaction tracker and tax label mapper for blockchain transactio
 
 - **Multi-chain Support**: Track transactions on Creditcoin and Humanity Protocol networks
 - **Automatic Transaction Categorization**: Maps blockchain transactions to Awaken tax labels where possible
-- **CSV Export**: Export transactions to CSV format compatible with tax software
+- **CSV Export**: Export transactions to CSV format compatible with Awaken
 - **Real-time Transaction Fetching**: Fetch transactions directly from blockchain explorers
 
 ## Supported Networks
@@ -16,7 +16,7 @@ A multi-chain transaction tracker and tax label mapper for blockchain transactio
 
 ## Awaken Compatibility
 
-Transactions are labeled with Awaken-compatible tags (snake_case format) where the transaction type can be clearly identified. The labeling follows a conservative approach:
+Transactions are tagged with Awaken-compatible labels (snake_case format) where the transaction type can be clearly identified. The labeling follows a conservative approach:
 
 - **Native token transfers** (sending) → `payment`
 - **Native token transfers** (receiving) → `receive`
