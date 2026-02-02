@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import {
     ArrowUpDown,
     ArrowUp,
@@ -23,7 +23,7 @@ interface TransactionTableProps {
     onSelectionChange: (ids: string[]) => void
 }
 
-type SortField = 'date' | 'type' | 'status' | 'amount' | 'asset'
+type SortField = 'date' | 'type' | 'status' | 'amount' | 'asset' | 'fee'
 type SortOrder = 'asc' | 'desc'
 
 interface SortConfig {
@@ -36,35 +36,36 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 10
 
-    // toggle sort
-    const handleSort = (field: SortField) => {
+    // Toggle sort - immediate response, no debounce
+    const handleSort = useCallback((field: SortField) => {
         setSortConfig(prev => {
             if (prev.field === field) {
                 return { field, order: prev.order === 'asc' ? 'desc' : 'asc' }
             }
             return { field, order: 'desc' }
         })
-        setCurrentPage(1) // Reset to first page on sort change
-    }
+        setCurrentPage(1)
+    }, [])
 
-    // selection helpers
-    const handleSelectAll = (checked: boolean) => {
+    // Selection helpers - using useCallback for stability
+    const handleSelectAll = useCallback((checked: boolean) => {
         if (checked) {
+            // Select all currently displayed transactions
             onSelectionChange(data.map(tx => tx.id))
         } else {
             onSelectionChange([])
         }
-    }
+    }, [data, onSelectionChange])
 
-    const handleSelectOne = (id: string, checked: boolean) => {
+    const handleSelectOne = useCallback((id: string, checked: boolean) => {
         if (checked) {
             onSelectionChange([...selectedIds, id])
         } else {
             onSelectionChange(selectedIds.filter(selectedId => selectedId !== id))
         }
-    }
+    }, [selectedIds, onSelectionChange])
 
-    // Derived Data
+    // Derived Data - sorted
     const sortedData = useMemo(() => {
         return [...data].sort((a, b) => {
             let cmp = 0
@@ -79,42 +80,48 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                     cmp = a.status.localeCompare(b.status)
                     break
                 case 'amount':
-                    // Compare by total value (sent + received as absolute)
                     const amtA = parseFloat(a.sentQuantity || "0") + parseFloat(a.receivedQuantity || "0")
                     const amtB = parseFloat(b.sentQuantity || "0") + parseFloat(b.receivedQuantity || "0")
                     cmp = amtA - amtB
                     break
                 case 'asset':
-                    // Sort by primary currency (received first, then sent)
                     const assetA = a.receivedCurrency || a.sentCurrency || ""
                     const assetB = b.receivedCurrency || b.sentCurrency || ""
                     cmp = assetA.localeCompare(assetB)
+                    break
+                case 'fee':
+                    const feeA = parseFloat(a.feeAmount || "0")
+                    const feeB = parseFloat(b.feeAmount || "0")
+                    cmp = feeA - feeB
                     break
             }
             return sortConfig.order === 'asc' ? cmp : -cmp
         })
     }, [data, sortConfig])
 
+    // Paginated data
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage
         return sortedData.slice(start, start + itemsPerPage)
     }, [sortedData, currentPage])
 
     const totalPages = Math.ceil(data.length / itemsPerPage)
-    const allSelected = data.length > 0 && selectedIds.length === data.length
-    const someSelected = selectedIds.length > 0 && !allSelected
+
+    // Checkbox state - only check if ALL displayed items are selected
+    const allSelected = data.length > 0 && paginatedData.length > 0 && paginatedData.every(tx => selectedIds.includes(tx.id))
+    const someSelected = paginatedData.some(tx => selectedIds.includes(tx.id)) && !allSelected
 
     // Sort indicator component
     const SortIndicator = ({ field }: { field: SortField }) => {
         if (sortConfig.field !== field) {
-            return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+            return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />
         }
         return sortConfig.order === 'asc'
             ? <ArrowUp className="h-3.5 w-3.5 text-primary" />
             : <ArrowDown className="h-3.5 w-3.5 text-primary" />
     }
 
-    // Sortable header component
+    // Sortable header component with fixed animation
     const SortableHeader = ({
         field,
         children,
@@ -127,8 +134,8 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
         <th
             className={`
                 h-12 px-4 text-left align-middle font-medium text-muted-foreground
-                cursor-pointer select-none group
-                hover:bg-muted/50 transition-colors
+                cursor-pointer select-none
+                hover:bg-muted/50
                 ${className}
             `}
             onClick={() => handleSort(field)}
@@ -182,9 +189,9 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                 <SortableHeader field="amount">
                                     Amount
                                 </SortableHeader>
-                                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                                <SortableHeader field="fee">
                                     Fee
-                                </th>
+                                </SortableHeader>
                                 <SortableHeader field="status" className="w-[120px]">
                                     Status
                                 </SortableHeader>
@@ -194,18 +201,14 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
-                            {paginatedData.map((tx, index) => (
+                            {paginatedData.map((tx) => (
                                 <tr
                                     key={tx.id}
                                     className="
                                         border-b border-border/50
-                                        transition-all duration-150
-                                        hover:bg-muted/40 hover:shadow-sm
+                                        hover:bg-muted/40
                                         data-[state=selected]:bg-primary/5
                                     "
-                                    style={{
-                                        animationDelay: `${index * 30}ms`
-                                    }}
                                 >
                                     <td className="p-4 align-middle">
                                         <Checkbox
@@ -277,7 +280,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                             variant="ghost"
                                             size="icon"
                                             asChild
-                                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
+                                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary"
                                         >
                                             <a href={tx.link} target="_blank" rel="noopener noreferrer">
                                                 <ExternalLink className="h-4 w-4" />
@@ -304,13 +307,12 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                         size="sm"
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
-                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 disabled:opacity-50"
                     >
                         Previous
                     </Button>
                     <div className="flex items-center gap-1">
                         {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            // Show window of pages around current
                             let pageNum = i + 1
                             if (totalPages > 5) {
                                 if (currentPage > 3) {
@@ -339,7 +341,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                         size="sm"
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 disabled:opacity-50"
                     >
                         Next
                     </Button>

@@ -1,14 +1,12 @@
 import { useState, useMemo } from "react"
-import { Filter, X, Calendar, Coins } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Filter, Calendar, Coins, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
 import { type ParsedTransaction, ActionType } from "@/utils/csv"
+import { cn } from "@/lib/utils"
 
 export interface FilterState {
     transactionTypes: ActionType[]
+    datePreset: string
     dateFrom: string
     dateTo: string
     assetFilter: string
@@ -21,15 +19,24 @@ interface FilterPanelProps {
 }
 
 const TRANSACTION_TYPE_OPTIONS = [
-    { value: ActionType.SEND, label: "Native Transfer", description: "Outgoing transfers" },
-    { value: ActionType.RECEIVE, label: "Receive", description: "Incoming transfers" },
-    { value: ActionType.SWAP, label: "Swap", description: "Token exchanges" },
-    { value: ActionType.CONTRACT, label: "Contract Interaction", description: "Smart contract calls" },
-    { value: ActionType.UNKNOWN, label: "Unknown", description: "Unclassified transactions" },
+    { value: ActionType.SEND, label: "Native Transfer" },
+    { value: ActionType.RECEIVE, label: "Receive" },
+    { value: ActionType.SWAP, label: "Swap" },
+    { value: ActionType.CONTRACT, label: "Contract Interaction" },
+]
+
+const DATE_PRESETS = [
+    { value: "all", label: "All Time" },
+    { value: "1m", label: "1 Month" },
+    { value: "3m", label: "3 Months" },
+    { value: "6m", label: "6 Months" },
+    { value: "1y", label: "1 Year" },
 ]
 
 export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPanelProps) {
-    const [isExpanded, setIsExpanded] = useState(false)
+    const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+    const [showAssetDropdown, setShowAssetDropdown] = useState(false)
+    const [showDateDropdown, setShowDateDropdown] = useState(false)
 
     // Get unique assets from transactions
     const availableAssets = useMemo(() => {
@@ -46,6 +53,7 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
     const activeFilterCount = useMemo(() => {
         let count = 0
         if (filters.transactionTypes.length > 0) count++
+        if (filters.datePreset !== "all") count++
         if (filters.dateFrom) count++
         if (filters.dateTo) count++
         if (filters.assetFilter) count++
@@ -59,17 +67,51 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
         onFiltersChange({ ...filters, transactionTypes: newTypes })
     }
 
-    const handleReset = () => {
-        onFiltersChange({
-            transactionTypes: [],
-            dateFrom: "",
-            dateTo: "",
-            assetFilter: ""
-        })
+    const handleDatePresetChange = (preset: string) => {
+        const now = new Date()
+        let dateFrom = ""
+        let dateTo = ""
+
+        switch (preset) {
+            case "1m":
+                dateFrom = new Date(now.setMonth(now.getMonth() - 1)).toISOString().split('T')[0]
+                break
+            case "3m":
+                dateFrom = new Date(now.setMonth(now.getMonth() - 3)).toISOString().split('T')[0]
+                break
+            case "6m":
+                dateFrom = new Date(now.setMonth(now.getMonth() - 6)).toISOString().split('T')[0]
+                break
+            case "1y":
+                dateFrom = new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().split('T')[0]
+                break
+            case "all":
+                dateFrom = ""
+                dateTo = ""
+                break
+            case "custom":
+                // Keep existing dates, just open the date picker
+                setShowDateDropdown(true)
+                return
+        }
+
+        onFiltersChange({ ...filters, datePreset: preset, dateFrom, dateTo })
+        setShowDateDropdown(false)
     }
 
     const handleAssetChange = (value: string) => {
         onFiltersChange({ ...filters, assetFilter: value })
+        setShowAssetDropdown(false)
+    }
+
+    const handleReset = () => {
+        onFiltersChange({
+            transactionTypes: [],
+            datePreset: "all",
+            dateFrom: "",
+            dateTo: "",
+            assetFilter: ""
+        })
     }
 
     // Filtered count preview
@@ -97,168 +139,214 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
         }).length
     }, [transactions, filters])
 
-    if (!isExpanded) {
-        return (
-            <Button
-                variant="outline"
-                onClick={() => setIsExpanded(true)}
-                className="w-full justify-between group hover:border-primary/50 hover:bg-primary/5 transition-all"
-            >
-                <div className="flex items-center gap-2">
-                    <Filter className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                    <span>Filters</span>
-                    {activeFilterCount > 0 && (
-                        <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary">
-                            {activeFilterCount}
-                        </Badge>
-                    )}
-                </div>
-                <span className="text-xs text-muted-foreground">
-                    {filteredCount} of {transactions.length} transactions
-                </span>
-            </Button>
-        )
+    const getDatePresetLabel = () => {
+        const preset = DATE_PRESETS.find(p => p.value === filters.datePreset)
+        return preset?.label || "All Time"
     }
 
     return (
-        <Card className="border-border/50 shadow-lg bg-gradient-to-br from-card to-card/95 backdrop-blur animate-in fade-in-50 slide-in-from-top-2">
-            <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                        <Filter className="h-5 w-5 text-primary" />
-                        Filter Transactions
-                    </CardTitle>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setIsExpanded(false)}
-                        className="h-8 w-8 hover:bg-muted"
-                    >
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {/* Transaction Types */}
-                <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground">Transaction Type</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {TRANSACTION_TYPE_OPTIONS.map((option) => (
-                            <label
-                                key={option.value}
-                                className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:border-primary/30 hover:bg-primary/5 cursor-pointer transition-all group"
-                            >
-                                <Checkbox
-                                    checked={filters.transactionTypes.includes(option.value)}
-                                    onChange={(e: any) => handleTypeToggle(option.value, e.target.checked)}
-                                    className="mt-0.5"
-                                />
-                                <div className="flex-1">
-                                    <div className="text-sm font-medium group-hover:text-primary transition-colors">
-                                        {option.label}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                        {option.description}
-                                    </div>
-                                </div>
-                            </label>
-                        ))}
-                    </div>
-                </div>
+        <div className="flex flex-wrap items-center gap-3 p-4 bg-card border border-border/50 rounded-lg">
+            {/* Filter Icon & Label */}
+            <div className="flex items-center gap-2 mr-2">
+                <Filter className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium text-foreground">Filters</span>
+            </div>
 
-                {/* Date Range */}
-                <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        Date Range
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-muted-foreground">From</label>
-                            <Input
-                                type="date"
-                                value={filters.dateFrom}
-                                onChange={(e) => onFiltersChange({ ...filters, dateFrom: e.target.value })}
-                                className="h-9"
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs text-muted-foreground">To</label>
-                            <Input
-                                type="date"
-                                value={filters.dateTo}
-                                onChange={(e) => onFiltersChange({ ...filters, dateTo: e.target.value })}
-                                className="h-9"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Asset Filter */}
-                <div className="space-y-3">
-                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                        <Coins className="h-4 w-4 text-muted-foreground" />
-                        Asset Filter
-                    </label>
-                    <div className="relative">
-                        <Input
-                            type="text"
-                            placeholder="Search by asset (e.g., ETH, USDC)..."
-                            value={filters.assetFilter}
-                            onChange={(e) => handleAssetChange(e.target.value)}
-                            className="h-9 pr-20"
-                        />
-                        {availableAssets.length > 0 && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                                {availableAssets.slice(0, 3).map(asset => (
+            {/* Date Preset Dropdown */}
+            <div className="relative">
+                <Button
+                    variant="outline"
+                    onClick={() => setShowDateDropdown(!showDateDropdown)}
+                    className={cn(
+                        "h-9 justify-between min-w-[140px]",
+                        filters.datePreset !== "all" && "border-primary/50 text-primary"
+                    )}
+                >
+                    <span className="flex items-center gap-2">
+                        <Calendar className={cn("h-4 w-4", filters.datePreset !== "all" && "text-primary")} />
+                        {getDatePresetLabel()}
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+                {showDateDropdown && (
+                    <div className="absolute top-full left-0 mt-1 z-10 w-64 bg-popover border rounded-lg shadow-lg p-3">
+                        {filters.datePreset !== 'custom' ? (
+                            <>
+                                {DATE_PRESETS.map((preset) => (
                                     <button
-                                        key={asset}
-                                        onClick={() => handleAssetChange(asset)}
-                                        className="text-[10px] px-1.5 py-0.5 rounded bg-muted hover:bg-primary/20 hover:text-primary transition-colors"
+                                        key={preset.value}
+                                        onClick={() => handleDatePresetChange(preset.value)}
+                                        className={cn(
+                                            "w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors rounded",
+                                            filters.datePreset === preset.value && "bg-primary/10 text-primary"
+                                        )}
                                     >
-                                        {asset}
+                                        {preset.label}
                                     </button>
                                 ))}
+                                <hr className="my-2 border-border/50" />
+                                <button
+                                    onClick={() => {
+                                        onFiltersChange({ ...filters, datePreset: 'custom', dateFrom: '', dateTo: '' })
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors rounded text-primary"
+                                >
+                                    Custom Range...
+                                </button>
+                            </>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                    Custom Date Range
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-xs text-muted-foreground block mb-1">From</label>
+                                        <input
+                                            type="date"
+                                            value={filters.dateFrom}
+                                            onChange={(e) => onFiltersChange({ ...filters, dateFrom: e.target.value, datePreset: 'custom' })}
+                                            className="w-full px-2 py-1.5 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-muted-foreground block mb-1">To</label>
+                                        <input
+                                            type="date"
+                                            value={filters.dateTo}
+                                            onChange={(e) => onFiltersChange({ ...filters, dateTo: e.target.value, datePreset: 'custom' })}
+                                            className="w-full px-2 py-1.5 text-sm border rounded bg-background focus:outline-none focus:ring-1 focus:ring-primary"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                    <button
+                                        onClick={() => {
+                                            onFiltersChange({ ...filters, datePreset: 'all', dateFrom: '', dateTo: '' })
+                                            setShowDateDropdown(false)
+                                        }}
+                                        className="flex-1 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        Clear
+                                    </button>
+                                    <button
+                                        onClick={() => setShowDateDropdown(false)}
+                                        className="flex-1 px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 transition-colors"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>
-                    {filters.assetFilter && (
-                        <p className="text-xs text-muted-foreground">
-                            Showing transactions involving{" "}
-                            <span className="font-medium text-foreground">{filters.assetFilter}</span>
-                        </p>
-                    )}
-                </div>
+                )}
+            </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                    <div className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{filteredCount}</span>
-                        {" "}of {transactions.length} transactions
+            {/* Transaction Type Dropdown */}
+            <div className="relative">
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setShowTypeDropdown(!showTypeDropdown)
+                        setShowDateDropdown(false)
+                        setShowAssetDropdown(false)
+                    }}
+                    className={cn(
+                        "h-9 justify-between min-w-[140px]",
+                        filters.transactionTypes.length > 0 && "border-primary/50 text-primary"
+                    )}
+                >
+                    <span className={cn(filters.transactionTypes.length > 0 && "text-primary")}>
+                        {filters.transactionTypes.length === 0
+                            ? "All Types"
+                            : `${filters.transactionTypes.length} selected`}
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+                {showTypeDropdown && (
+                    <div className="absolute top-full left-0 mt-1 z-10 w-56 bg-popover border rounded-md shadow-lg">
+                        <div className="p-2">
+                            {TRANSACTION_TYPE_OPTIONS.map((option) => (
+                                <label
+                                    key={option.value}
+                                    className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.transactionTypes.includes(option.value)}
+                                        onChange={(e) => handleTypeToggle(option.value, e.target.checked)}
+                                        className="rounded border-gray-300"
+                                    />
+                                    <span className="text-sm">{option.label}</span>
+                                </label>
+                            ))}
+                        </div>
                     </div>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleReset}
-                            disabled={activeFilterCount === 0}
-                            className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                )}
+            </div>
+
+            {/* Asset Dropdown */}
+            <div className="relative">
+                <Button
+                    variant="outline"
+                    onClick={() => {
+                        setShowAssetDropdown(!showAssetDropdown)
+                        setShowTypeDropdown(false)
+                        setShowDateDropdown(false)
+                    }}
+                    className={cn(
+                        "h-9 justify-between min-w-[120px]",
+                        filters.assetFilter && "border-primary/50 text-primary"
+                    )}
+                >
+                    <span className="flex items-center gap-2">
+                        <Coins className={cn("h-4 w-4", filters.assetFilter && "text-primary")} />
+                        {filters.assetFilter || "All Assets"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+                {showAssetDropdown && (
+                    <div className="absolute top-full left-0 mt-1 z-10 w-48 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
+                        <button
+                            onClick={() => handleAssetChange("")}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b transition-colors"
                         >
-                            <X className="mr-1.5 h-3.5 w-3.5" />
-                            Reset
-                        </Button>
-                        <Button
-                            size="sm"
-                            onClick={() => setIsExpanded(false)}
-                            className="bg-primary hover:bg-primary/90"
-                        >
-                            <Filter className="mr-1.5 h-3.5 w-3.5" />
-                            Apply Filters
-                        </Button>
+                            All Assets
+                        </button>
+                        {availableAssets.map((asset) => (
+                            <button
+                                key={asset}
+                                onClick={() => handleAssetChange(asset)}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            >
+                                {asset}
+                            </button>
+                        ))}
                     </div>
-                </div>
-            </CardContent>
-        </Card>
+                )}
+            </div>
+
+            {/* Reset Button */}
+            {activeFilterCount > 0 && (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleReset}
+                    className="h-9 text-muted-foreground hover:text-destructive transition-colors"
+                >
+                    <X className="h-4 w-4 mr-1" />
+                    Reset
+                </Button>
+            )}
+
+            {/* Results Count */}
+            <span className="text-sm text-muted-foreground ml-auto">
+                <span className="font-medium text-foreground">{filteredCount}</span>
+                <span className="mx-1">of</span>
+                <span className="font-medium text-foreground">{transactions.length}</span>
+                <span className="ml-1">transactions</span>
+            </span>
+        </div>
     )
 }
 
