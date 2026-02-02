@@ -118,13 +118,6 @@ export function AddressInput({ network, onSubmit, isLoading, clearError }: Addre
                 </div>
             )}
 
-            {/* Helper text */}
-            {!error && !value && (
-                <p className="text-xs text-muted-foreground">
-                    Enter your {config.label} wallet address to view transaction history
-                </p>
-            )}
-
             {/* Submit button */}
             <Button
                 type="submit"

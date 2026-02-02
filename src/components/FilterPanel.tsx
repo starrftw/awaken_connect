@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react"
-import { Filter, Calendar, Coins, ChevronDown, X } from "lucide-react"
+import { Filter, Calendar, ChevronDown, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { type ParsedTransaction, ActionType } from "@/utils/csv"
 import { cn } from "@/lib/utils"
@@ -9,7 +9,6 @@ export interface FilterState {
     datePreset: string
     dateFrom: string
     dateTo: string
-    assetFilter: string
 }
 
 interface FilterPanelProps {
@@ -35,19 +34,9 @@ const DATE_PRESETS = [
 
 export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPanelProps) {
     const [showTypeDropdown, setShowTypeDropdown] = useState(false)
-    const [showAssetDropdown, setShowAssetDropdown] = useState(false)
     const [showDateDropdown, setShowDateDropdown] = useState(false)
 
-    // Get unique assets from transactions
-    const availableAssets = useMemo(() => {
-        const assets = new Set<string>()
-        transactions.forEach(tx => {
-            if (tx.receivedCurrency) assets.add(tx.receivedCurrency)
-            if (tx.sentCurrency) assets.add(tx.sentCurrency)
-            if (tx.feeCurrency) assets.add(tx.feeCurrency)
-        })
-        return Array.from(assets).sort()
-    }, [transactions])
+
 
     // Count active filters
     const activeFilterCount = useMemo(() => {
@@ -56,7 +45,6 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
         if (filters.datePreset !== "all") count++
         if (filters.dateFrom) count++
         if (filters.dateTo) count++
-        if (filters.assetFilter) count++
         return count
     }, [filters])
 
@@ -99,18 +87,12 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
         setShowDateDropdown(false)
     }
 
-    const handleAssetChange = (value: string) => {
-        onFiltersChange({ ...filters, assetFilter: value })
-        setShowAssetDropdown(false)
-    }
-
     const handleReset = () => {
         onFiltersChange({
             transactionTypes: [],
             datePreset: "all",
             dateFrom: "",
             dateTo: "",
-            assetFilter: ""
         })
     }
 
@@ -127,13 +109,6 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
             }
             if (filters.dateTo && tx.date > new Date(filters.dateTo)) {
                 return false
-            }
-            // Asset filter
-            if (filters.assetFilter) {
-                const assets = [tx.receivedCurrency, tx.sentCurrency, tx.feeCurrency].filter(Boolean)
-                if (!assets.some(a => a?.toLowerCase().includes(filters.assetFilter.toLowerCase()))) {
-                    return false
-                }
             }
             return true
         }).length
@@ -249,7 +224,6 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
                     onClick={() => {
                         setShowTypeDropdown(!showTypeDropdown)
                         setShowDateDropdown(false)
-                        setShowAssetDropdown(false)
                     }}
                     className={cn(
                         "h-9 justify-between min-w-[140px]",
@@ -281,47 +255,6 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
                                 </label>
                             ))}
                         </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Asset Dropdown */}
-            <div className="relative">
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        setShowAssetDropdown(!showAssetDropdown)
-                        setShowTypeDropdown(false)
-                        setShowDateDropdown(false)
-                    }}
-                    className={cn(
-                        "h-9 justify-between min-w-[120px]",
-                        filters.assetFilter && "border-primary/50 text-primary"
-                    )}
-                >
-                    <span className="flex items-center gap-2">
-                        <Coins className={cn("h-4 w-4", filters.assetFilter && "text-primary")} />
-                        {filters.assetFilter || "All Assets"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 ml-2" />
-                </Button>
-                {showAssetDropdown && (
-                    <div className="absolute top-full left-0 mt-1 z-10 w-48 bg-popover border rounded-md shadow-lg max-h-48 overflow-auto">
-                        <button
-                            onClick={() => handleAssetChange("")}
-                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b transition-colors"
-                        >
-                            All Assets
-                        </button>
-                        {availableAssets.map((asset) => (
-                            <button
-                                key={asset}
-                                onClick={() => handleAssetChange(asset)}
-                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
-                            >
-                                {asset}
-                            </button>
-                        ))}
                     </div>
                 )}
             </div>
@@ -370,13 +303,6 @@ export function applyFilters(
             const toDate = new Date(filters.dateTo)
             toDate.setHours(23, 59, 59, 999)
             if (tx.date > toDate) return false
-        }
-        // Asset filter
-        if (filters.assetFilter) {
-            const assets = [tx.receivedCurrency, tx.sentCurrency, tx.feeCurrency].filter(Boolean)
-            if (!assets.some(a => a?.toLowerCase().includes(filters.assetFilter.toLowerCase()))) {
-                return false
-            }
         }
         return true
     })

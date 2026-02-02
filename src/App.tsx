@@ -28,7 +28,6 @@ export default function App() {
         datePreset: "all",
         dateFrom: "",
         dateTo: "",
-        assetFilter: ""
     })
 
     // Apply filters whenever transactions or filters change
@@ -47,7 +46,6 @@ export default function App() {
             datePreset: "all",
             dateFrom: "",
             dateTo: "",
-            assetFilter: ""
         })
     }
 
@@ -106,7 +104,7 @@ export default function App() {
     }
 
     const hasTransactions = transactions.length > 0
-    const hasFilters = filters.transactionTypes.length > 0 || filters.dateFrom || filters.dateTo || filters.assetFilter
+    const hasFilters = filters.transactionTypes.length > 0 || filters.dateFrom || filters.dateTo
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 text-foreground font-sans p-4 sm:p-8">
@@ -123,7 +121,7 @@ export default function App() {
                         </h1>
                     </div>
                     <h1 className="text-3xl font-bold tracking-tight">Make Your Crypto Assets Tax-Ready</h1>
-                    <p className="text-muted-foreground max-w-lg text-lg">
+                    <p className="text-muted-foreground max-w-lg text-lg text-wrap: balance">
                         Export your transaction history to an Awaken-compatible CSV in 45 seconds.
                     </p>
                     <div className="flex items-center justify-center gap-12 pt-4">
@@ -134,7 +132,7 @@ export default function App() {
                         </div>
                         <div className="flex flex-col items-center text-center gap-1">
                             <Link2Off className="h-6 w-6 text-blue-500" />
-                            <span className="font-semibold text-foreground">No Wallet Connection</span>
+                            <span className="font-semibold text-foreground">No Auth Needed</span>
                             <span className="text-xs text-muted-foreground">Just paste your address</span>
                         </div>
                         <div className="flex flex-col items-center text-center gap-1">
@@ -199,7 +197,7 @@ export default function App() {
                                     </div>
                                     <div className="flex items-start gap-3">
                                         <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">3</div>
-                                        <p className="text-sm text-muted-foreground pt-0.5">Export CSV and upload to Awaken.</p>
+                                        <p className="text-sm text-muted-foreground pt-0.5">Export CSV and upload to <a href="https://awaken.tax" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Awaken.tax</a>.</p>
                                     </div>
                                 </div>
                             </div>
