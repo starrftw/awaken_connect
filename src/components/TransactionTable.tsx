@@ -1,19 +1,21 @@
 import { useState, useMemo } from "react"
 import {
     ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
     ExternalLink,
-
     Clock,
     TrendingUp,
     TrendingDown,
     RefreshCcw,
-    FileText
+    FileText,
+    SearchX
 } from "lucide-react"
 import { type ParsedTransaction, TransactionStatus, ActionType } from "@/utils/csv"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-
+import { Card } from "@/components/ui/card"
 
 interface TransactionTableProps {
     data: ParsedTransaction[]
@@ -21,23 +23,28 @@ interface TransactionTableProps {
     onSelectionChange: (ids: string[]) => void
 }
 
-type SortField = 'date' | 'type' | 'status' | 'amount'
+type SortField = 'date' | 'type' | 'status' | 'amount' | 'asset'
 type SortOrder = 'asc' | 'desc'
 
+interface SortConfig {
+    field: SortField
+    order: SortOrder
+}
+
 export function TransactionTable({ data, selectedIds, onSelectionChange }: TransactionTableProps) {
-    const [sortField, setSortField] = useState<SortField>('date')
-    const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'date', order: 'desc' })
     const [currentPage, setCurrentPage] = useState(1)
     const itemsPerPage = 10
 
     // toggle sort
     const handleSort = (field: SortField) => {
-        if (sortField === field) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-        } else {
-            setSortField(field)
-            setSortOrder('desc') // Default desc for new field usually better for dates/amounts
-        }
+        setSortConfig(prev => {
+            if (prev.field === field) {
+                return { field, order: prev.order === 'asc' ? 'desc' : 'asc' }
+            }
+            return { field, order: 'desc' }
+        })
+        setCurrentPage(1) // Reset to first page on sort change
     }
 
     // selection helpers
@@ -61,7 +68,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
     const sortedData = useMemo(() => {
         return [...data].sort((a, b) => {
             let cmp = 0
-            switch (sortField) {
+            switch (sortConfig.field) {
                 case 'date':
                     cmp = a.date.getTime() - b.date.getTime()
                     break
@@ -69,18 +76,24 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                     cmp = a.type.localeCompare(b.type)
                     break
                 case 'status':
-                    cmp = a.status.localeCompare(b.status) // Primitive enum string sort
+                    cmp = a.status.localeCompare(b.status)
                     break
                 case 'amount':
-                    // Rough heuristic: Compare Sent quantity first, then Received
-                    const amtA = parseFloat(a.sentQuantity || a.receivedQuantity || "0")
-                    const amtB = parseFloat(b.sentQuantity || b.receivedQuantity || "0")
+                    // Compare by total value (sent + received as absolute)
+                    const amtA = parseFloat(a.sentQuantity || "0") + parseFloat(a.receivedQuantity || "0")
+                    const amtB = parseFloat(b.sentQuantity || "0") + parseFloat(b.receivedQuantity || "0")
                     cmp = amtA - amtB
                     break
+                case 'asset':
+                    // Sort by primary currency (received first, then sent)
+                    const assetA = a.receivedCurrency || a.sentCurrency || ""
+                    const assetB = b.receivedCurrency || b.sentCurrency || ""
+                    cmp = assetA.localeCompare(assetB)
+                    break
             }
-            return sortOrder === 'asc' ? cmp : -cmp
+            return sortConfig.order === 'asc' ? cmp : -cmp
         })
-    }, [data, sortField, sortOrder])
+    }, [data, sortConfig])
 
     const paginatedData = useMemo(() => {
         const start = (currentPage - 1) * itemsPerPage
@@ -91,27 +104,63 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
     const allSelected = data.length > 0 && selectedIds.length === data.length
     const someSelected = selectedIds.length > 0 && !allSelected
 
+    // Sort indicator component
+    const SortIndicator = ({ field }: { field: SortField }) => {
+        if (sortConfig.field !== field) {
+            return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+        }
+        return sortConfig.order === 'asc'
+            ? <ArrowUp className="h-3.5 w-3.5 text-primary" />
+            : <ArrowDown className="h-3.5 w-3.5 text-primary" />
+    }
+
+    // Sortable header component
+    const SortableHeader = ({
+        field,
+        children,
+        className = ""
+    }: {
+        field: SortField
+        children: React.ReactNode
+        className?: string
+    }) => (
+        <th
+            className={`
+                h-12 px-4 text-left align-middle font-medium text-muted-foreground
+                cursor-pointer select-none group
+                hover:bg-muted/50 transition-colors
+                ${className}
+            `}
+            onClick={() => handleSort(field)}
+        >
+            <div className="flex items-center gap-1.5">
+                {children}
+                <SortIndicator field={field} />
+            </div>
+        </th>
+    )
+
     if (data.length === 0) {
         return (
-            <div className="flex min-h-[200px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center animate-in fade-in-50">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                    <FileText className="h-6 w-6 text-muted-foreground" />
+            <Card className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center border-dashed border-2 border-border/50 bg-gradient-to-b from-muted/20 to-transparent">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/50 shadow-sm">
+                    <SearchX className="h-7 w-7 text-muted-foreground" />
                 </div>
-                <h3 className="mt-4 text-lg font-semibold">No transactions found</h3>
-                <p className="mb-4 mt-2 text-sm text-muted-foreground">
-                    Enter a valid wallet address above to load history.
+                <h3 className="mt-5 text-lg font-semibold text-foreground">No transactions found</h3>
+                <p className="mb-4 mt-2 text-sm text-muted-foreground max-w-sm">
+                    Try adjusting your filters or search criteria to find what you're looking for.
                 </p>
-            </div>
+            </Card>
         )
     }
 
     return (
         <div className="space-y-4">
-            <div className="rounded-md border bg-card">
+            <Card className="border-border/50 shadow-xl shadow-black/5 overflow-hidden bg-gradient-to-b from-card to-card/95">
                 <div className="relative w-full overflow-auto">
                     <table className="w-full caption-bottom text-sm">
-                        <thead className="[&_tr]:border-b">
-                            <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                        <thead className="bg-muted/50 border-b border-border/50">
+                            <tr>
                                 <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[50px]">
                                     <Checkbox
                                         checked={allSelected}
@@ -121,67 +170,115 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                         onChange={(e: any) => handleSelectAll(e.target.checked)}
                                     />
                                 </th>
-                                <th
-                                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                                    onClick={() => handleSort('date')}
-                                >
-                                    <div className="flex items-center gap-1">
-                                        Date
-                                        <ArrowUpDown className="h-4 w-4" />
-                                    </div>
+                                <SortableHeader field="date" className="w-[180px]">
+                                    Date
+                                </SortableHeader>
+                                <SortableHeader field="type" className="w-[140px]">
+                                    Type
+                                </SortableHeader>
+                                <SortableHeader field="asset">
+                                    Asset
+                                </SortableHeader>
+                                <SortableHeader field="amount">
+                                    Amount
+                                </SortableHeader>
+                                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                                    Fee
                                 </th>
-                                <th
-                                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                                    onClick={() => handleSort('type')}
-                                >
-                                    <div className="flex items-center gap-1">Type <ArrowUpDown className="h-3 w-3" /></div>
+                                <SortableHeader field="status" className="w-[120px]">
+                                    Status
+                                </SortableHeader>
+                                <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[80px]">
+                                    View
                                 </th>
-                                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Amount</th>
-                                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Fee</th>
-                                <th
-                                    className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground"
-                                    onClick={() => handleSort('status')}
-                                >
-                                    <div className="flex items-center gap-1">Status <ArrowUpDown className="h-3 w-3" /></div>
-                                </th>
-                                <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">View</th>
                             </tr>
                         </thead>
                         <tbody className="[&_tr:last-child]:border-0">
-                            {paginatedData.map((tx) => (
-                                <tr key={tx.id} className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
+                            {paginatedData.map((tx, index) => (
+                                <tr
+                                    key={tx.id}
+                                    className="
+                                        border-b border-border/50
+                                        transition-all duration-150
+                                        hover:bg-muted/40 hover:shadow-sm
+                                        data-[state=selected]:bg-primary/5
+                                    "
+                                    style={{
+                                        animationDelay: `${index * 30}ms`
+                                    }}
+                                >
                                     <td className="p-4 align-middle">
                                         <Checkbox
                                             checked={selectedIds.includes(tx.id)}
                                             onChange={(e: any) => handleSelectOne(tx.id, e.target.checked)}
                                         />
                                     </td>
-                                    <td className="p-4 align-middle font-mono text-xs">{formatDateDisplay(tx.date)}</td>
+                                    <td className="p-4 align-middle">
+                                        <div className="font-mono text-xs text-muted-foreground">
+                                            {formatDateDisplay(tx.date)}
+                                        </div>
+                                    </td>
                                     <td className="p-4 align-middle">
                                         <div className="flex items-center gap-2">
-                                            {getActionIcon(tx.type)}
-                                            <span className="capitalize">{tx.type}</span>
+                                            <div className="rounded-md p-1.5 bg-muted/50 ring-1 ring-border/50">
+                                                {getActionIcon(tx.type)}
+                                            </div>
+                                            <span className="capitalize text-sm font-medium">{tx.type.replace('_', ' ')}</span>
                                         </div>
                                     </td>
                                     <td className="p-4 align-middle">
-                                        <div className="flex flex-col">
-                                            {tx.receivedQuantity && (
-                                                <span className="text-green-500 font-mono">+{tx.receivedQuantity} {tx.receivedCurrency}</span>
+                                        <div className="flex flex-col gap-0.5">
+                                            {tx.receivedCurrency && (
+                                                <span className="text-xs font-medium text-green-600 bg-green-50 dark:bg-green-950/30 px-2 py-0.5 rounded-full w-fit">
+                                                    {tx.receivedCurrency}
+                                                </span>
                                             )}
-                                            {tx.sentQuantity && (
-                                                <span className="text-red-500 font-mono">-{tx.sentQuantity} {tx.sentCurrency}</span>
+                                            {tx.sentCurrency && (
+                                                <span className="text-xs font-medium text-red-600 bg-red-50 dark:bg-red-950/30 px-2 py-0.5 rounded-full w-fit">
+                                                    {tx.sentCurrency}
+                                                </span>
                                             )}
-                                            {!tx.receivedQuantity && !tx.sentQuantity && <span className="text-muted-foreground">-</span>}
+                                            {!tx.receivedCurrency && !tx.sentCurrency && (
+                                                <span className="text-xs text-muted-foreground">-</span>
+                                            )}
                                         </div>
                                     </td>
-                                    <td className="p-4 align-middle text-xs text-muted-foreground">
-                                        {tx.feeAmount ? `${tx.feeAmount} ${tx.feeCurrency}` : '-'}
+                                    <td className="p-4 align-middle">
+                                        <div className="flex flex-col gap-0.5">
+                                            {tx.receivedQuantity && (
+                                                <span className="text-green-600 font-mono text-sm font-medium">
+                                                    +{tx.receivedQuantity}
+                                                </span>
+                                            )}
+                                            {tx.sentQuantity && (
+                                                <span className="text-red-600 font-mono text-sm font-medium">
+                                                    -{tx.sentQuantity}
+                                                </span>
+                                            )}
+                                            {!tx.receivedQuantity && !tx.sentQuantity && (
+                                                <span className="text-muted-foreground text-sm">-</span>
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 align-middle">
+                                        {tx.feeAmount ? (
+                                            <span className="text-xs text-muted-foreground font-mono">
+                                                {tx.feeAmount} {tx.feeCurrency}
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">-</span>
+                                        )}
                                     </td>
                                     <td className="p-4 align-middle">
                                         {getStatusBadge(tx.status)}
                                     </td>
                                     <td className="p-4 align-middle text-right">
-                                        <Button variant="ghost" size="icon" asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            asChild
+                                            className="h-8 w-8 hover:bg-primary/10 hover:text-primary transition-colors"
+                                        >
                                             <a href={tx.link} target="_blank" rel="noopener noreferrer">
                                                 <ExternalLink className="h-4 w-4" />
                                                 <span className="sr-only">View Transaction</span>
@@ -193,32 +290,60 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </Card>
 
             {/* Pagination */}
-            <div className="flex items-center justify-end space-x-2 py-4">
-                <div className="text-sm text-muted-foreground flex-1">
-                    {selectedIds.length} of {data.length} row(s) selected
+            <div className="flex items-center justify-between py-4 px-2">
+                <div className="text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">{selectedIds.length}</span>
+                    {" "}of {data.length} row(s) selected
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                >
-                    Previous
-                </Button>
-                <div className="text-sm font-medium">
-                    Page {currentPage} of {totalPages || 1}
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                    >
+                        Previous
+                    </Button>
+                    <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            // Show window of pages around current
+                            let pageNum = i + 1
+                            if (totalPages > 5) {
+                                if (currentPage > 3) {
+                                    pageNum = currentPage - 2 + i
+                                }
+                                if (currentPage > totalPages - 2) {
+                                    pageNum = totalPages - 4 + i
+                                }
+                            }
+                            if (pageNum > totalPages) return null
+                            return (
+                                <Button
+                                    key={pageNum}
+                                    variant={currentPage === pageNum ? "default" : "ghost"}
+                                    size="icon"
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    className="h-8 w-8 text-xs"
+                                >
+                                    {pageNum}
+                                </Button>
+                            )
+                        })}
+                    </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages || totalPages === 0}
+                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors disabled:opacity-50"
+                    >
+                        Next
+                    </Button>
                 </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages || totalPages === 0}
-                >
-                    Next
-                </Button>
             </div>
         </div>
     )
@@ -235,23 +360,57 @@ function formatDateDisplay(d: Date) {
 }
 
 function getActionIcon(type: ActionType) {
+    const iconClass = "h-3.5 w-3.5"
     switch (type) {
-        case ActionType.RECEIVE: return <TrendingDown className="h-4 w-4 text-green-500" />
-        case ActionType.SEND: return <TrendingUp className="h-4 w-4 text-red-500" />
-        case ActionType.SWAP: return <RefreshCcw className="h-4 w-4 text-blue-500" />
-        default: return <FileText className="h-4 w-4 text-gray-500" />
+        case ActionType.RECEIVE:
+            return <TrendingDown className={`${iconClass} text-green-500`} />
+        case ActionType.SEND:
+            return <TrendingUp className={`${iconClass} text-red-500`} />
+        case ActionType.SWAP:
+            return <RefreshCcw className={`${iconClass} text-blue-500`} />
+        default:
+            return <FileText className={`${iconClass} text-gray-500`} />
     }
 }
 
 function getStatusBadge(status: TransactionStatus) {
     switch (status) {
         case TransactionStatus.SUCCESS:
-            return <Badge variant="default" className="bg-green-500/15 text-green-500 hover:bg-green-500/25 border-0">Success</Badge>
+            return (
+                <Badge
+                    variant="default"
+                    className="bg-green-500/15 text-green-600 hover:bg-green-500/25 border-0 font-medium text-xs"
+                >
+                    Success
+                </Badge>
+            )
         case TransactionStatus.FAILED:
-            return <Badge variant="destructive">Failed</Badge>
+            return (
+                <Badge
+                    variant="destructive"
+                    className="font-medium text-xs"
+                >
+                    Failed
+                </Badge>
+            )
         case TransactionStatus.PENDING:
-            return <Badge variant="secondary"><Clock className="mr-1 h-3 w-3" /> Pending</Badge>
+            return (
+                <Badge
+                    variant="secondary"
+                    className="font-medium text-xs"
+                >
+                    <Clock className="mr-1 h-3 w-3" />
+                    Pending
+                </Badge>
+            )
         default:
-            return <Badge variant="outline">Unknown</Badge>
+            return (
+                <Badge
+                    variant="outline"
+                    className="font-medium text-xs text-muted-foreground"
+                >
+                    Unknown
+                </Badge>
+            )
     }
 }
