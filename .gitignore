@@ -13,6 +13,9 @@ dist-ssr
 *.local
 plans/
 
+# Private planning documents
+BLOCKCHAIN_INTEGRATION_ROADMAP.md
+
 
 # Editor directories and files
 .vscode/*

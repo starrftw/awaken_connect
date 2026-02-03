@@ -2,8 +2,9 @@
 
 ## Awaken Connect - Multi-Chain Expansion Strategy
 
-**Document Version:** 1.0  
+**Document Version:** 2.0  
 **Created:** 2026-02-03  
+**Last Updated:** 2026-02-03  
 **Status:** Planning Complete
 
 ---
@@ -11,7 +12,7 @@
 ## Table of Contents
 
 1. [Executive Summary](#executive-summary)
-2. [Celo Integration Technical Roadmap](#celo-integration-technical-roadmap)
+2. [Soneium Integration Technical Roadmap](#sonium-integration-technical-roadmap)
 3. [Queue-Based Expansion Plan](#queue-based-expansion-plan)
 4. [Scalable Architecture Design](#scalable-architecture-design)
 5. [UI/UX Checklist for Interface Stability](#uiux-checklist-for-interface-stability)
@@ -22,169 +23,120 @@
 
 ## Executive Summary
 
-This document outlines the comprehensive technical roadmap for expanding Awaken Connect's blockchain integration capabilities. The strategy prioritizes **Celo** as the first new network due to its Ethereum compatibility and widespread adoption, followed by a structured queue-based approach for additional networks.
+This document outlines the comprehensive technical roadmap for expanding Awaken Connect's blockchain integration capabilities. The strategy prioritizes **Soneium** (Sony Chain) as the next network due to its EVM compatibility and growing gaming/NFT ecosystem, following the established Celo adapter pattern.
 
 ### Current State
 
-- **Supported Networks:** Creditcoin, Fuel, Humanity Protocol
+- **Supported Networks:** Creditcoin, Humanity Protocol, Celo (3 total)
 - **Adapter Pattern:** Network-specific adapters in `src/adapters/{network}.ts`
 - **Network Configuration:** Hardcoded in `src/components/NetworkSelector.tsx`
 - **Transaction Parsing:** Unified `ParsedTransaction` interface in `src/utils/csv.ts`
 
 ### Goals
 
-1. Add Celo network support with full compatibility
-2. Establish scalable patterns for future network additions
+1. Add Soneium network support with full compatibility
+2. Reuse proven Celo adapter patterns for EVM chains
 3. Maintain UI/UX stability across all screen sizes
 4. Document lessons learned for continuous improvement
 
 ---
 
-## Celo Integration Technical Roadmap
+## Soneium Integration Technical Roadmap
 
 ### Phase 1: Research & Discovery
 
-**Duration:** 2-3 days
-
-#### 1.1 Celo Blockchain Architecture Analysis
-
-Celo is an EVM-compatible Layer 1 blockchain with the following characteristics:
+**Soneium Blockchain Architecture:**
 
 | Aspect | Details |
 |--------|---------|
-| **Consensus** | Proof-of-Stake (PBFT-inspired) |
-| **EVM Compatibility** | Full EVM compatibility |
-| **Block Time** | ~5 seconds |
-| **Native Asset** | CELO |
-| **Stablecoins** | cUSD, cEUR (and cREAL) |
+| **Type** | EVM-compatible L2 |
+| **Consensus** | Proof of Stake |
+| **Block Time** | ~2 seconds |
+| **Native Asset** | SON |
+| **Explorer** | Soneium explorer (Blockscout-based) |
 
-#### 1.2 RPC Endpoints and Explorers
+**API Endpoints:**
 
 ```typescript
-// Primary endpoints for Celo
-const CELO_CONFIG = {
+// Soneium configuration
+const SONEIUM_CONFIG = {
     mainnet: {
-        rpc: 'https://forno.celo.org',
-        explorer: 'https://explorer.celo.org',
-        api: 'https://explorer.celo.org/api',
-        chainId: 42220
+        rpc: 'https://sonium-rpc.example.com', // TBD
+        explorer: 'https://sonium-explorer.blockscout.com',
+        api: 'https://sonium-explorer.blockscout.com/api',
+        chainId: TBD
     },
     testnet: {
-        rpc: 'https://alfajores-forno.celo.org',
-        explorer: 'https://alfajores.explorer.celo.org',
-        api: 'https://alfajores.explorer.celo.org/api',
-        chainId: 44787
+        rpc: 'https://sonium-testnet-rpc.example.com', // TBD
+        explorer: 'https://sonium-testnet-explorer.blockscout.com',
+        api: 'https://sonium-testnet-explorer.blockscout.com/api',
+        chainId: TBD
     }
 };
 ```
 
-#### 1.3 Transaction Indexing Capabilities
-
-Celo supports multiple indexing approaches:
+#### 1.1 Transaction Indexing Approaches
 
 1. **Blockscout-based API** (Recommended for MVP)
-   - Endpoint: `https://explorer.celo.org/api?module=account&action=txlist&address={address}`
-   - Similar to Creditcoin adapter pattern
+   - Endpoint pattern: `{explorer}/api?module=account&action=txlist&address={address}`
+   - Similar to Creditcoin and Celo adapter patterns
    - Returns: `from`, `to`, `value`, `input`, `gasUsed`, `gasPrice`, `timeStamp`, `hash`
 
-2. **Celo GraphQL Indexer**
-   - Alternative for advanced use cases
-   - More complex implementation
-
-3. **Native RPC Methods**
+2. **Native RPC Methods**
    - `eth_getTransactionByHash`
    - `eth_getLogs` for event filtering
    - Requires pagination logic
 
-#### 1.4 Celo-Specific Transaction Types
+#### 1.2 Soneium-Specific Transaction Types
 
 ```typescript
-// Celo transaction characteristics
-interface CeloTransactionCharacteristics {
+interface SoneiumTransactionCharacteristics {
     // Native transfers
     nativeTransfer: {
-        nativeAsset: 'CELO',
+        nativeAsset: 'SON',
         decimals: 18,
         methodId: '0x' // Empty input for simple transfers
     };
     
-    // Celo-specific operations
-    celoOperations: {
-        // Validator operations
-        registerValidator: '0x5c219f6e',
-        voteValidator: '0x9412e437',
-        
-        // Governance
-        propose: '0xda95691a',
-        vote: '0x8b0f61b4',
-        
-        // Stablecoin transfers
-        transferStable: '0xa9059cbb', // Same as ERC20
-        mintStable: '0x40c10f19',
+    // Sony ecosystem operations
+    sonyOperations: {
+        // TBD: Sony-specific method signatures
     };
     
     // Fee model
     feeModel: {
         type: 'gas', // EIP-1559 compatible
-        currency: 'CELO',
-        currencyStable: 'cUSD' // Optional fee payment in stablecoins
+        currency: 'SON'
     };
 }
 ```
 
-#### 1.5 Celo Stablecoin Assets
-
-| Asset | Symbol | Decimals | Contract Address |
-|-------|--------|----------|------------------|
-| Celo Dollar | cUSD | 18 | `0x765de816845861e75a25fda122ca63f820c71ea32` |
-| Celo Euro | cEUR | 18 | `0xd8763cba276735b661f87f8b3fdb9809a65df9d0` |
-| Celo Real | cREAL | 18 | `0xe8537a3d0568c48021e53d8c2f64c84f7f0a52b1` |
-| Celo | CELO | 18 | Native |
-
 ---
 
-### Phase 2: Adapter Architecture Design
+### Phase 2: Adapter Architecture
 
-**Duration:** 1-2 days
-
-#### 2.1 Network Enum Update
-
-Update `src/components/NetworkSelector.tsx`:
-
-```typescript
-// Before
-export type Network = 'creditcoin' | 'humanity';
-
-// After
-export type Network = 'creditcoin' | 'humanity' | 'celo';
-```
-
-#### 2.2 Adapter Pattern Structure
-
-Create `src/adapters/celo.ts` following the existing pattern:
+Create `src/adapters/sonium.ts` following the Celo pattern:
 
 ```typescript
 import { ActionType, type ParsedTransaction, TransactionStatus } from '../utils/csv';
 import { mapToAwakenLabel } from '../utils/awakenLabels';
 
-// Configuration
-const API_ENDPOINT = 'https://explorer.celo.org/api';
+const API_ENDPOINT = 'https://sonium-explorer.blockscout.com/api';
 
-// Fetch transactions for a Celo address
-export async function fetchCeloTransactions(
+export async function fetchSoniumTransactions(
     address: string,
     options?: { isTestnet?: boolean }
 ): Promise<ParsedTransaction[]> {
     const isTestnet = options?.isTestnet ?? false;
     const baseUrl = isTestnet 
-        ? 'https://alfajores.explorer.celo.org/api'
+        ? 'https://sonium-testnet-explorer.blockscout.com/api'
         : API_ENDPOINT;
     
     const url = `${baseUrl}?module=account&action=txlist&address=${address}`;
     
     const response = await fetch(url);
     if (!response.ok) {
-        throw new Error(`Celo Explorer API Error: ${response.statusText}`);
+        throw new Error(`Soneium Explorer API Error: ${response.statusText}`);
     }
     
     const json = await response.json();
@@ -194,13 +146,12 @@ export async function fetchCeloTransactions(
     }
     
     const transactions = json.result || [];
-    return transactions.map((tx: any) => parseCeloTransaction(tx, address));
+    return transactions.map((tx: any) => parseSoniumTransaction(tx, address, isTestnet));
 }
 
-// Parse individual Celo transaction
-function parseCeloTransaction(tx: any, userAddress: string): ParsedTransaction {
+function parseSoniumTransaction(tx: any, userAddress: string, isTestnet: boolean): ParsedTransaction {
     const isSender = tx.from.toLowerCase() === userAddress.toLowerCase();
-    const decimals = 18; // CELO uses 18 decimals
+    const decimals = 18;
     
     const valueStr = formatUnits(tx.value, decimals);
     const fee = formatUnits(
@@ -208,10 +159,7 @@ function parseCeloTransaction(tx: any, userAddress: string): ParsedTransaction {
         decimals
     );
     
-    // Detect transaction type
-    const txType = detectCeloTransactionType(tx);
-    
-    // Determine action type
+    const txType = detectSoniumTransactionType(tx);
     let actionType = isSender ? ActionType.SEND : ActionType.RECEIVE;
     if (['exactInputSingle', 'exactOutputSingle', 'swap'].includes(txType)) {
         actionType = ActionType.SWAP;
@@ -223,49 +171,34 @@ function parseCeloTransaction(tx: any, userAddress: string): ParsedTransaction {
         id: tx.hash,
         date: new Date(parseInt(tx.timeStamp) * 1000),
         receivedQuantity: isSender ? '' : valueStr,
-        receivedCurrency: isSender ? '' : 'CELO',
+        receivedCurrency: isSender ? '' : 'SON',
         sentQuantity: isSender ? valueStr : '',
-        sentCurrency: isSender ? 'CELO' : '',
+        sentCurrency: isSender ? 'SON' : '',
         feeAmount: isSender ? fee : '',
-        feeCurrency: isSender ? 'CELO' : '',
+        feeCurrency: isSender ? 'SON' : '',
         hash: tx.hash,
-        notes: buildCeloNotes(tx, isSender, txType),
-        status: mapCeloStatus(tx.txreceipt_status),
+        notes: buildSoniumNotes(tx, isSender, txType),
+        status: mapSoniumStatus(tx.txreceipt_status),
         type: actionType,
-        link: `${isTestnet ? 'https://alfajores.explorer.celo.org' : 'https://explorer.celo.org'}/tx/${tx.hash}`,
+        link: `${isTestnet ? 'https://sonium-testnet-explorer.blockscout.com' : 'https://sonium-explorer.blockscout.com'}/tx/${tx.hash}`,
         tag: mapToAwakenLabel(txType, txType === 'native_transfer', isSender)
     };
 }
 
-// Detect Celo-specific transaction types
-function detectCeloTransactionType(tx: any): string {
+function detectSoniumTransactionType(tx: any): string {
     const input = tx.input || '0x';
     const methodId = input.slice(0, 10).toLowerCase();
     
     const methodSignatures: Record<string, string> = {
-        // ERC20/Token operations (same as Creditcoin)
         '0xa9059cbb': 'token_transfer',
         '0x23b872dd': 'token_transferFrom',
         '0x095ea7b3': 'token_approve',
-        
-        // Celo-specific operations
-        '0x5c219f6e': 'register_validator',
-        '0x9412e437': 'vote_validator',
-        '0xda95691a': 'governance_propose',
-        '0x8b0f61b4': 'governance_vote',
-        
-        // DEX/Swap operations
-        '0x414bf389': 'exactInputSingle',
-        '0x88316456': 'exactInput',
-        '0xc04b8d59': 'exactOutputSingle',
     };
     
-    // Contract creation check
     if (!tx.to || tx.to === '') {
         return 'contract_creation';
     }
     
-    // Contract interaction check
     if (input && input !== '0x' && input.length > 2) {
         const detectedMethod = methodSignatures[methodId];
         if (detectedMethod) return detectedMethod;
@@ -275,30 +208,23 @@ function detectCeloTransactionType(tx: any): string {
     return 'native_transfer';
 }
 
-// Map Celo status to TransactionStatus enum
-function mapCeloStatus(status: string | undefined): TransactionStatus {
+function mapSoniumStatus(status: string | undefined): TransactionStatus {
     if (status === '1') return TransactionStatus.SUCCESS;
     if (status === '0') return TransactionStatus.FAILED;
     return TransactionStatus.UNKNOWN;
 }
 
-// Build human-readable notes
-function buildCeloNotes(tx: any, isSender: boolean, txType: string): string {
+function buildSoniumNotes(tx: any, isSender: boolean, txType: string): string {
     const typeLabels: Record<string, string> = {
-        'native_transfer': isSender ? 'Sent CELO' : 'Received CELO',
+        'native_transfer': isSender ? 'Sent SON' : 'Received SON',
         'token_transfer': 'Token Transfer',
-        'register_validator': 'Register Validator',
-        'vote_validator': 'Vote for Validator',
-        'governance_propose': 'Governance Proposal',
-        'governance_vote': 'Governance Vote',
         'contract_creation': 'Contract Creation',
         'contract_call': 'Contract Interaction',
     };
     
-    return typeLabels[txType] || (isSender ? 'Sent CELO' : 'Received CELO');
+    return typeLabels[txType] || (isSender ? 'Sent SON' : 'Received SON');
 }
 
-// Format units helper (same as other adapters)
 function formatUnits(value: string, decimals: number): string {
     if (!value || value === '0') return '0';
     if (value.startsWith('-')) return '0';
@@ -314,56 +240,14 @@ function formatUnits(value: string, decimals: number): string {
 }
 ```
 
-#### 2.3 Address Validation
+#### 2.1 Address Validation
 
-Celo uses the same address format as Ethereum (0x...):
-
-```typescript
-export function validateCeloAddress(address: string): boolean {
-    // Basic format check: starts with 0x and is 42 characters
-    const celoAddressRegex = /^0x[a-fA-F0-9]{40}$/;
-    return celoAddressRegex.test(address);
-}
-```
-
-#### 2.4 Celo Gas/Fee Model Handling
-
-Celo uses EIP-1559-style gas pricing:
+Soneium uses the same address format as Ethereum (0x...):
 
 ```typescript
-interface CeloGasInfo {
-    gasPrice: string;      // In wei
-    gasUsed: string;       // Units consumed
-    feeCurrency?: string;  // Optional: cUSD, cEUR, or CELO
-}
-
-function parseCeloFee(gasInfo: CeloGasInfo): { amount: string; currency: string } {
-    const decimals = 18;
-    const feeWei = BigInt(gasInfo.gasPrice) * BigInt(gasInfo.gasUsed);
-    const feeCELO = formatUnits(feeWei.toString(), decimals);
-    
-    // Celo allows fee payment in stablecoins
-    if (gasInfo.feeCurrency && gasInfo.feeCurrency !== '0x0000000000000000000000000000000000000000') {
-        return {
-            amount: feeCELO,
-            currency: mapCeloStablecoin(gasInfo.feeCurrency)
-        };
-    }
-    
-    return {
-        amount: feeCELO,
-        currency: 'CELO'
-    };
-}
-
-function mapCeloStablecoin(address: string): string {
-    const stablecoins: Record<string, string> = {
-        '0x765de816845861e75a25fda122ca63f820c71ea32': 'cUSD',
-        '0xd8763cba276735b661f87f8b3fdb9809a65df9d0': 'cEUR',
-        '0xe8537a3d0568c48021e53d8c2f64c84f7f0a52b1': 'cREAL',
-    };
-    
-    return stablecoins[address.toLowerCase()] || 'CELO';
+export function validateSoniumAddress(address: string): boolean {
+    const soniumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+    return soniumAddressRegex.test(address);
 }
 ```
 
@@ -371,15 +255,11 @@ function mapCeloStablecoin(address: string): string {
 
 ### Phase 3: Implementation
 
-**Duration:** 2-3 days
-
 #### 3.1 App.tsx Integration
-
-Update `src/App.tsx` to handle Celo:
 
 ```typescript
 // Add import
-import { fetchCeloTransactions } from './adapters/celo';
+import { fetchSoniumTransactions } from './adapters/sonium';
 
 // In handleFetch function
 const handleFetch = async (address: string) => {
@@ -393,6 +273,8 @@ const handleFetch = async (address: string) => {
             data = await fetchHumanityTransactions(address);
         } else if (network === 'celo') {
             data = await fetchCeloTransactions(address);
+        } else if (network === 'sonium') {
+            data = await fetchSoniumTransactions(address);
         }
         
         if (data.length === 0) {
@@ -425,7 +307,12 @@ const NETWORKS: NetworkOption[] = [
     {
         id: 'celo',
         name: 'Celo',
-        logo: '/celo-logo.png'  // Add this file
+        logo: '/celo-logo.svg'
+    },
+    {
+        id: 'sonium',
+        name: 'Soneium',
+        logo: '/sonium-logo.png' // Add this file
     }
 ];
 ```
@@ -434,30 +321,28 @@ const NETWORKS: NetworkOption[] = [
 
 ### Phase 4: Testing & Validation
 
-**Duration:** 2-3 days
-
-#### 4.1 Unit Tests for Celo Adapter
+#### 4.1 Unit Tests for Sonium Adapter
 
 ```typescript
-// tests/celo.test.ts
-import { fetchCeloTransactions, validateCeloAddress } from '../src/adapters/celo';
+// tests/sonium.test.ts
+import { fetchSoniumTransactions, validateSoniumAddress } from '../src/adapters/sonium';
 
-describe('Celo Adapter', () => {
-    describe('validateCeloAddress', () => {
-        it('should validate correct Celo addresses', () => {
-            expect(validateCeloAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD48')).toBe(true);
+describe('Sonium Adapter', () => {
+    describe('validateSoniumAddress', () => {
+        it('should validate correct Sonium addresses', () => {
+            expect(validateSoniumAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD48')).toBe(true);
         });
         
         it('should reject invalid addresses', () => {
-            expect(validateCeloAddress('0x123')).toBe(false);
-            expect(validateCeloAddress('not-an-address')).toBe(false);
+            expect(validateSoniumAddress('0x123')).toBe(false);
+            expect(validateSoniumAddress('not-an-address')).toBe(false);
         });
     });
     
-    describe('fetchCeloTransactions', () => {
+    describe('fetchSoniumTransactions', () => {
         it('should fetch transactions from testnet', async () => {
             const testAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD48';
-            const transactions = await fetchCeloTransactions(testAddress, { isTestnet: true });
+            const transactions = await fetchSoniumTransactions(testAddress, { isTestnet: true });
             expect(Array.isArray(transactions)).toBe(true);
         });
     });
@@ -468,21 +353,19 @@ describe('Celo Adapter', () => {
 
 | Network | Address | Expected Transactions |
 |---------|---------|----------------------|
-| Celo Mainnet | `0x742d35Cc6634C0532925a3b844Bc9e7595f2bD48` | Various |
-| Celo Alfajores | `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` | Test transactions |
+| Soneium Mainnet | `0x742d35Cc6634C0532925a3b844Bc9e7595f2bD48` | Various |
+| Soneium Testnet | `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` | Test transactions |
 
 ---
 
 ### Phase 5: Production Release
 
-**Duration:** 1 day
-
 #### 5.1 Pre-Deployment Checklist
 
-- [ ] Add Celo logo to `public/celo-logo.png`
-- [ ] Update NetworkSelector with Celo option
+- [ ] Add Sonium logo to `public/sonium-logo.png`
+- [ ] Update NetworkSelector with Sonium option
 - [ ] Run `npm run build` - no errors
-- [ ] Test with real Celo addresses
+- [ ] Test with real Sonium addresses
 - [ ] Verify CSV export compatibility
 - [ ] Update "How it Works" panel if needed
 - [ ] Deploy to production
@@ -491,119 +374,23 @@ describe('Celo Adapter', () => {
 
 ## Queue-Based Expansion Plan
 
-### Queue Position 2: Berachain
-
-**Estimated Integration Time:** 3-4 days
-
-#### Research Requirements
-
-```typescript
-interface BerachainResearch {
-    networkType: 'EVM-compatible' | 'Custom';
-    rpcEndpoints: {
-        mainnet: string;
-        testnet: string;
-    };
-    explorerApi: {
-        baseUrl: string;
-        endpoints: string[];
-    };
-    nativeAsset: {
-        symbol: string;
-        decimals: number;
-    };
-    transactionTypes: string[];
-    specialFeatures: string[];
-}
-```
-
-#### Adapter Pattern Adaptation
-
-Berachain uses a unique Proof-of-Liquidity consensus. The adapter will need to:
-
-1. **Research API**: Determine if Berachain uses Blockscout, custom explorer, or GraphQL
-2. **Transaction Types**: Identify native operations (validator stakes, governance)
-3. **Fee Model**: Understand Berachain's fee structure
-
----
-
-### Queue Position 3: Abstract
-
-**Estimated Integration Time:** 3-4 days
-
-#### Research Requirements
-
-```typescript
-interface AbstractResearch {
-    networkType: 'L2' | 'L1' | 'AppChain';
-    parentChain?: string;
-    rpcEndpoints: {
-        mainnet: string;
-        testnet?: string;
-    };
-    explorerApi: {
-        baseUrl: string;
-        type: 'Blockscout' | 'Etherscan' | 'Custom';
-    };
-    nativeAsset: {
-        symbol: string;
-        decimals: number;
-        contractAddress?: string;
-    };
-}
-```
-
-#### Implementation Notes
-
-Abstract is an app chain that may use a custom architecture. Key considerations:
-
-1. **Parent Chain Integration**: If Abstract is an L2, may need to fetch from both L1 and L2
-2. **Bridge Transactions**: Abstract may have native bridge operations
-3. **Token Standards**: Check for ERC-20 or custom token implementations
-
----
-
 ### Queue Position 4: Soneium (Sony Chain)
 
-**Estimated Integration Time:** 4-5 days
+**Estimated Integration Time:** 4-5 days  
+**Status:** Next Priority
 
-#### Research Requirements
+Soneium is Sony's Ethereum L2 with strong gaming/NFT ecosystem integration. Key considerations:
 
-```typescript
-interface SoneiumResearch {
-    networkType: 'EVM-compatible L2';
-    parentChain: 'Ethereum';
-    rpcEndpoints: {
-        mainnet: string;
-        testnet: string;
-    };
-    explorerApi: {
-        baseUrl: string;
-        type: 'Blockscout' | 'Other';
-    };
-    nativeAsset: {
-        symbol: string;
-        decimals: number;
-    };
-    specialFeatures: string[]; // Sony ecosystem integration
-}
-```
-
-#### Implementation Notes
-
-Soneium is Sony's Ethereum L2. Considerations:
-
-1. **Sony Ecosystem**: Identify Sony-specific tokens and operations
-2. **Bridge Operations**: L2 bridge transactions
-3. **Indexed NFTs**: May have NFT transaction support
+1. **EVM Compatibility:** Can reuse Celo adapter pattern directly
+2. **Blockscout Explorer:** Likely available for transaction indexing
+3. **Sony Ecosystem:** Identify Sony-specific tokens and operations
+4. **Bridge Operations:** L2 bridge transactions
 
 ---
 
 ### Queue Position 5: Kala
 
 **Estimated Integration Time:** 3-4 days
-
-#### Research Requirements
 
 ```typescript
 interface KalaResearch {
@@ -711,10 +498,8 @@ src/
 │   ├── creditcoin.ts    // Existing
 │   ├── fuel.ts          // Existing
 │   ├── humanity.ts      // Existing
-│   ├── celo.ts          // Priority 1 - NEW
-│   ├── berachain.ts     // Queue Position 2
-│   ├── abstract.ts      // Queue Position 3
-│   ├── soneium.ts       // Queue Position 4
+│   ├── celo.ts          // Priority 1 - COMPLETED
+│   ├── sonium.ts        // Priority 4 - NEXT
 │   └── kala.ts          // Queue Position 5
 ├── config/
 │   └── supportedNetworks.ts  // NEW - Centralized config
@@ -751,7 +536,7 @@ export interface NetworkMetadata {
         apiPath: string; // e.g., 'api' for Blockscout
     };
     features: {
-        stablecoins: string[]; // e.g., ['cUSD', 'cEUR']
+        stablecoins: string[];
         staking: boolean;
         governance: boolean;
     };
@@ -819,13 +604,42 @@ export const SUPPORTED_NETWORKS: NetworkMetadata[] = [
             governance: true
         },
         logo: {
-            light: '/celo-logo.png'
+            light: '/celo-logo.svg'
         },
         displayOrder: 2
+    },
+    {
+        id: 'sonium',
+        name: 'Soneium',
+        shortName: 'SON',
+        chainId: TBD,
+        isTestnetSupported: true,
+        nativeCurrency: {
+            symbol: 'SON',
+            name: 'Soneium',
+            decimals: 18
+        },
+        rpc: {
+            mainnet: 'https://sonium-rpc.example.com',
+            testnet: 'https://sonium-testnet-rpc.example.com'
+        },
+        explorer: {
+            mainnet: 'https://sonium-explorer.blockscout.com',
+            testnet: 'https://sonium-testnet-explorer.blockscout.com',
+            apiPath: 'api'
+        },
+        features: {
+            stablecoins: [],
+            staking: true,
+            governance: false
+        },
+        logo: {
+            light: '/sonium-logo.png'
+        },
+        displayOrder: 3
     }
 ];
 
-// Helper functions
 export function getNetworkById(id: Network): NetworkMetadata | undefined {
     return SUPPORTED_NETWORKS.find(n => n.id === id);
 }
@@ -953,46 +767,38 @@ export async function fetchNetworkTransactions(
     address: string,
     options?: { isTestnet?: boolean }
 ): Promise<ParsedTransaction[]> {
-    // 1. Build API URL
     const baseUrl = options?.isTestnet 
         ? 'https://testnet.explorer.example.com/api'
         : API_ENDPOINT;
     const url = `${baseUrl}?module=account&action=txlist&address=${address}`;
     
-    // 2. Fetch data
     const response = await fetch(url);
     if (!response.ok) {
         throw new Error(`Network API Error: ${response.statusText}`);
     }
     
-    // 3. Parse response
     const json = await response.json();
     
-    // 4. Handle "no transactions" case
     if (json.status === '0' && json.message !== 'No transactions found') {
         throw new Error(`Explorer Error: ${json.message}`);
     }
     
-    // 5. Map and return
     const transactions = json.result || [];
     return transactions.map((tx: any) => parseTransaction(tx, address));
 }
 
 function parseTransaction(tx: any, userAddress: string): ParsedTransaction {
     const isSender = tx.from.toLowerCase() === userAddress.toLowerCase();
-    const decimals = 18; // Adjust per network
+    const decimals = 18;
     
-    // Parse amounts
     const valueStr = formatUnits(tx.value, decimals);
     const fee = formatUnits(
         (BigInt(tx.gasUsed) * BigInt(tx.gasPrice)).toString(),
         decimals
     );
     
-    // Detect transaction type
     const txType = detectTransactionType(tx);
     
-    // Determine action type
     let actionType = isSender ? ActionType.SEND : ActionType.RECEIVE;
     if (['swap', 'exactInputSingle'].includes(txType)) {
         actionType = ActionType.SWAP;
@@ -1025,7 +831,6 @@ function detectTransactionType(tx: any): string {
     const methodSignatures: Record<string, string> = {
         '0xa9059cbb': 'token_transfer',
         '0x23b872dd': 'token_transferFrom',
-        // Add network-specific methods
     };
     
     if (!tx.to) return 'contract_creation';
@@ -1133,19 +938,70 @@ export function validateNetworkAddress(address: string): boolean {
 - [x] Test transaction table with network data
 ```
 
+### Soneium Integration Checklist
+
+```markdown
+## Phase 1: Research & Discovery
+- [ ] Analyze Soneium blockchain architecture
+- [ ] Identify RPC endpoints and block explorers
+- [ ] Determine transaction indexing capabilities
+- [ ] Map Soneium-specific transaction types
+- [ ] Research Sony ecosystem tokens
+
+## Phase 2: Adapter Architecture Design
+- [ ] Create src/adapters/sonium.ts
+- [ ] Define Network enum update for Soneium
+- [ ] Map transaction types to Awaken-compatible labels
+- [ ] Implement address validation for Soneium addresses
+- [ ] Handle Soneium gas/fee model
+
+## Phase 3: Implementation
+- [ ] Implement fetchTransactions() method
+- [ ] Parse Soneium transaction data
+- [ ] Map internal types to mapToAwakenLabel() format
+- [ ] Implement CSV export compatibility
+- [ ] Test with Soneium testnet before mainnet
+
+## Phase 4: Testing & Validation
+- [ ] Unit tests for transaction parsing
+- [ ] Integration tests with real Soneium addresses
+- [ ] CSV output validation against Awaken format
+- [ ] Performance testing with large transaction histories
+
+## Phase 5: Production Release
+- [ ] Add Soneium logo to public folder
+- [ ] Update NetworkSelector with Soneium option
+- [ ] Update "How it Works" panel if needed
+- [ ] Deploy and monitor
+
+### UI/UX Verification
+- [ ] Test NetworkSelector on mobile (375px)
+- [ ] Test NetworkSelector on tablet (768px)
+- [ ] Test NetworkSelector on desktop (1200px+)
+- [ ] Verify dropdown doesn't cause horizontal scroll
+- [ ] Check "How it Works" panel layout
+- [ ] Verify filter bar doesn't break
+- [ ] Test transaction table with network data
+```
+
 ---
 
 ## Summary
 
 This roadmap provides a comprehensive plan for expanding Awaken Connect's blockchain integration capabilities:
 
-1. **Celo Integration**: Priority 1, with detailed phases from research to production
-2. **Queue System**: Structured approach for Berachain, Abstract, Soneium, and Kala
-3. **Scalable Architecture**: Configuration-driven design with centralized network metadata
-4. **UI/UX Stability**: Comprehensive checklists for pre- and post-addition testing
-5. **Documentation**: Clear patterns and examples for future development
+1. **Soneium Integration**: Next priority with detailed phases from research to production
+2. **Queue System**: Structured approach with Soneium (position 4) and Kala (position 5)
+3. **EVM Pattern Reuse**: Celo adapter pattern can be directly applied to Soneium
+4. **Scalable Architecture**: Configuration-driven design with centralized network metadata
+5. **UI/UX Stability**: Comprehensive checklists for pre- and post-addition testing
+6. **Documentation**: Clear patterns and examples for future development
 
 The roadmap is designed to be iterative, with lessons learned from each network integration improving the process for subsequent additions.
+
+**Excluded Networks:**
+- Berachain: Excluded from queue
+- Abstract: Excluded from queue
 
 ---
 
