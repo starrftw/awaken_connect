@@ -33,6 +33,13 @@ const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
         description: "Proof of humanity on blockchain",
         validate: (addr: string) => addr.startsWith('0x') && addr.length === 42,
         example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    },
+    celo: {
+        label: "Celo",
+        placeholder: "Enter Celo address (0x...)",
+        description: "Mobile-first EVM-compatible blockchain",
+        validate: (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr),
+        example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
     }
 }
 
@@ -43,9 +50,8 @@ export function AddressInput({ network, onSubmit, isLoading, clearError }: Addre
 
     const config = NETWORK_CONFIGS[network]
 
-    // Clear state when network changes
+    // Clear error only when network changes (NOT value)
     useEffect(() => {
-        setValue("")
         setError("")
     }, [network])
 

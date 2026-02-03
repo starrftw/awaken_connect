@@ -17,11 +17,10 @@ export async function fetchHumanityTransactions(address: string): Promise<Parsed
     }
 
     const transactions = json.result || [];
-
-    return transactions.map((tx: any) => parseHumanityTransaction(tx, address));
+    return transactions.map((tx: any, index: number) => parseHumanityTransaction(tx, address, index));
 }
 
-function parseHumanityTransaction(tx: any, userAddress: string): ParsedTransaction {
+function parseHumanityTransaction(tx: any, userAddress: string, index: number): ParsedTransaction {
     const isSender = tx.from.toLowerCase() === userAddress.toLowerCase();
     const decimals = 18; // Humanity Protocol native token is 18 decimals
 
@@ -37,8 +36,16 @@ function parseHumanityTransaction(tx: any, userAddress: string): ParsedTransacti
     // Detect transaction type based on input data and method
     const txType = detectTransactionType(tx);
 
+    // Determine action type
+    let actionType = isSender ? ActionType.SEND : ActionType.RECEIVE;
+    if (txType.toLowerCase().includes('swap') || txType === 'exactInputSingle' || txType === 'exactOutputSingle') {
+        actionType = ActionType.SWAP;
+    } else if (txType !== 'native_transfer' && txType !== 'token_transfer') {
+        actionType = ActionType.CONTRACT;
+    }
+
     return {
-        id: tx.hash,
+        id: `${tx.hash}_${index}`,
         date: new Date(parseInt(tx.timeStamp) * 1000),
         receivedQuantity: isSender ? "" : valueStr,
         receivedCurrency: isSender ? "" : "HMT",
@@ -49,7 +56,7 @@ function parseHumanityTransaction(tx: any, userAddress: string): ParsedTransacti
         hash: tx.hash,
         notes: buildNotes(tx, isSender, txType),
         status: status,
-        type: isSender ? ActionType.SEND : ActionType.RECEIVE,
+        type: actionType,
         link: `https://humanity-mainnet.explorer.alchemy.com/tx/${tx.hash}`,
         tag: mapToAwakenLabel(txType, txType === 'native_transfer', isSender)
     };

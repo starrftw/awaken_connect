@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Check } from "lucide-react"
 
-export type Network = 'creditcoin' | 'humanity'
+export type Network = 'creditcoin' | 'humanity' | 'celo'
 
 interface NetworkSelectorProps {
     selected: Network
@@ -26,6 +26,11 @@ const NETWORKS: NetworkOption[] = [
         id: 'humanity',
         name: 'Humanity Protocol',
         logo: '/humanity-logo.avif'
+    },
+    {
+        id: 'celo',
+        name: 'Celo',
+        logo: '/celo-logo.svg'
     }
 ]
 
@@ -85,7 +90,7 @@ export function NetworkSelector({ selected, onSelect, disabled }: NetworkSelecto
 
                 {/* Dropdown Menu */}
                 {isOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-20 w-[200px] bg-popover border rounded-lg shadow-lg overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 z-20 w-[200px] bg-popover border rounded-lg shadow-lg overflow-hidden transition-all duration-200 animate-in fade-in slide-in-from-top-2">
                         {NETWORKS.map((network) => {
                             const isSelected = selected === network.id
                             return (

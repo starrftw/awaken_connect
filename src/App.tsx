@@ -2,6 +2,7 @@ import { useState, useMemo } from "react"
 
 import { fetchCreditcoinTransactions } from "./adapters/creditcoin"
 import { fetchHumanityTransactions } from "./adapters/humanity"
+import { fetchCeloTransactions } from "./adapters/celo"
 import { type ParsedTransaction, downloadCSV } from "./utils/csv"
 import { NetworkSelector, type Network } from "./components/NetworkSelector"
 import { AddressInput } from "./components/AddressInput"
@@ -18,31 +19,78 @@ import { Download, FileSpreadsheet, Link2Off, Infinity, Lock } from "lucide-reac
 export default function App() {
     const [network, setNetwork] = useState<Network>('creditcoin')
     const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
-    const [filteredTransactions, setFilteredTransactions] = useState<ParsedTransaction[]>([])
+    const [searchQuery, setSearchQuery] = useState("")
     const [selectedIds, setSelectedIds] = useState<string[]>([])
     const [isLoading, setIsLoading] = useState(false)
     const [currentAddress, setCurrentAddress] = useState("")
     const [error, setError] = useState<string | null>(null)
     const [filters, setFilters] = useState<FilterState>({
         transactionTypes: [],
+        assetFilter: [],
         datePreset: "all",
         dateFrom: "",
         dateTo: "",
     })
 
-    // Apply filters whenever transactions or filters change
+    // Extract unique assets from all transactions
+    const availableAssets = useMemo(() => {
+        const assets = new Set<string>()
+        transactions.forEach(tx => {
+            if (tx.sentCurrency) assets.add(tx.sentCurrency)
+            if (tx.receivedCurrency) assets.add(tx.receivedCurrency)
+            if (tx.feeCurrency) assets.add(tx.feeCurrency)
+        })
+        return Array.from(assets).sort()
+    }, [transactions])
+
+    // Unified display logic - apply search then filters
     const displayedTransactions = useMemo(() => {
-        return applyFilters(filteredTransactions.length > 0 ? filteredTransactions : transactions, filters)
-    }, [transactions, filteredTransactions, filters])
+        let result = transactions
+
+        // 1. Apply Search
+        if (searchQuery.trim()) {
+            const lowerQuery = searchQuery.toLowerCase()
+            result = result.filter(tx => {
+                return (
+                    tx.hash.toLowerCase().includes(lowerQuery) ||
+                    tx.notes.toLowerCase().includes(lowerQuery) ||
+                    tx.receivedCurrency?.toLowerCase().includes(lowerQuery) ||
+                    tx.sentCurrency?.toLowerCase().includes(lowerQuery) ||
+                    tx.feeCurrency?.toLowerCase().includes(lowerQuery) ||
+                    tx.receivedQuantity?.includes(lowerQuery) ||
+                    tx.sentQuantity?.includes(lowerQuery) ||
+                    tx.status.toLowerCase().includes(lowerQuery) ||
+                    tx.type.toLowerCase().includes(lowerQuery)
+                )
+            })
+        }
+
+        // 2. Apply Filters
+        result = applyFilters(result, filters)
+
+        console.log('[App] Pipeline:', {
+            original: transactions.length,
+            searchQuery: searchQuery,
+            afterSearch: result.length,
+            filters: filters
+        })
+
+        return result
+    }, [transactions, searchQuery, filters])
 
     const handleNetworkChange = (n: Network) => {
+        console.log('[App] Network changing from', network, 'to', n)
+        console.log('[App] Current address before reset:', currentAddress)
         setNetwork(n)
         setTransactions([])
-        setFilteredTransactions([])
+        setSearchQuery("")
         setSelectedIds([])
-        setCurrentAddress("")
+        // FIX: Don't reset address here - let user keep it when switching networks
+        // setCurrentAddress("")
+        console.log('[App] Address preserved:', currentAddress)
         setFilters({
             transactionTypes: [],
+            assetFilter: [],
             datePreset: "all",
             dateFrom: "",
             dateTo: "",
@@ -57,7 +105,7 @@ export default function App() {
 
         setIsLoading(true)
         setTransactions([])
-        setFilteredTransactions([])
+        setSearchQuery("")
         setSelectedIds([])
         setCurrentAddress(address)
         setError(null)
@@ -68,6 +116,8 @@ export default function App() {
                 data = await fetchCreditcoinTransactions(address)
             } else if (network === 'humanity') {
                 data = await fetchHumanityTransactions(address)
+            } else if (network === 'celo') {
+                data = await fetchCeloTransactions(address, { isTestnet: false })
             }
 
             if (data.length === 0) {
@@ -80,12 +130,6 @@ export default function App() {
         } finally {
             setIsLoading(false)
         }
-    }
-
-    const handleSearchResults = (results: ParsedTransaction[]) => {
-        setFilteredTransactions(results)
-        // Preserve selections that still exist in the new results
-        setSelectedIds(prev => prev.filter(id => results.some(tx => tx.id === id)))
     }
 
     const handleExport = (onlySelected: boolean) => {
@@ -104,7 +148,8 @@ export default function App() {
     }
 
     const hasTransactions = transactions.length > 0
-    const hasFilters = filters.transactionTypes.length > 0 || filters.dateFrom || filters.dateTo
+    const hasSearchActive = searchQuery.length > 0
+    const hasFiltersActive = filters.transactionTypes.length > 0 || filters.assetFilter.length > 0 || filters.datePreset !== "all" || filters.dateFrom || filters.dateTo
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20 text-foreground font-sans p-4 sm:p-8">
@@ -239,7 +284,7 @@ export default function App() {
                                     <Button
                                         variant="outline"
                                         onClick={() => handleExport(true)}
-                                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors"
+                                        className="hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all duration-200 ease-in-out hover:scale-[1.02] active:scale-[0.98]"
                                     >
                                         <Download className="mr-2 h-4 w-4" />
                                         Download Selected ({selectedIds.length})
@@ -248,7 +293,7 @@ export default function App() {
                                 <Button
                                     variant="default"
                                     onClick={() => handleExport(false)}
-                                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-600 text-white shadow-lg shadow-green-500/20 transition-all"
+                                    className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-600 text-white shadow-lg shadow-green-500/20 transition-all duration-200 ease-in-out hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                     <Download className="mr-2 h-4 w-4" />
                                     Export All
@@ -258,8 +303,8 @@ export default function App() {
 
                         {/* Search Bar */}
                         <SearchBar
-                            transactions={transactions}
-                            onSearchResults={handleSearchResults}
+                            value={searchQuery}
+                            onChange={setSearchQuery}
                             placeholder="Search by hash, asset, or type..."
                         />
 
@@ -268,10 +313,11 @@ export default function App() {
                             transactions={transactions}
                             filters={filters}
                             onFiltersChange={setFilters}
+                            availableAssets={availableAssets}
                         />
 
                         {/* Results Info */}
-                        {(hasFilters || filteredTransactions.length > 0) && (
+                        {(hasSearchActive || hasFiltersActive) && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <span>Showing</span>
                                 <Badge variant="outline" className="font-mono">

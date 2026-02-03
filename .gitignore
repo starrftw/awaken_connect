@@ -11,7 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
-plans
+plans/
 
 
 # Editor directories and files
@@ -31,7 +31,27 @@ plans
 !tailwind.config.js
 !vite.config.js
 debug_output.txt
+*.mjs
+
+# Temporary development scripts
+test_*.js
+verify_*.js
+debug_*.js
+introspect_*.js
+check_*.js
+list_all_*.js
+discover_*.js
+brute_*.js
+inspect_*.js
+find_*.js
+convert_*.js
 
 # CSV files
-awaken_csv_format*.csv
 awaken_multi_asset_template.csv
+*.csv
+
+# Plans directory contents
+plans/*.csv
+plans/*.png
+plans/*.avif
+plans/*.md

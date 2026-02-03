@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 
 export interface FilterState {
     transactionTypes: ActionType[]
+    assetFilter: string[]
     datePreset: string
     dateFrom: string
     dateTo: string
@@ -15,6 +16,7 @@ interface FilterPanelProps {
     transactions: ParsedTransaction[]
     filters: FilterState
     onFiltersChange: (filters: FilterState) => void
+    availableAssets?: string[]
 }
 
 const TRANSACTION_TYPE_OPTIONS = [
@@ -22,6 +24,7 @@ const TRANSACTION_TYPE_OPTIONS = [
     { value: ActionType.RECEIVE, label: "Receive" },
     { value: ActionType.SWAP, label: "Swap" },
     { value: ActionType.CONTRACT, label: "Contract Interaction" },
+    { value: ActionType.UNKNOWN, label: "Unknown" },
 ]
 
 const DATE_PRESETS = [
@@ -32,9 +35,17 @@ const DATE_PRESETS = [
     { value: "1y", label: "1 Year" },
 ]
 
-export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPanelProps) {
+export function FilterPanel({ transactions, filters, onFiltersChange, availableAssets = [] }: FilterPanelProps) {
     const [showTypeDropdown, setShowTypeDropdown] = useState(false)
     const [showDateDropdown, setShowDateDropdown] = useState(false)
+    const [showAssetDropdown, setShowAssetDropdown] = useState(false)
+
+    // Debug: Log available assets
+    console.log('[FilterPanel] Rendered with:', {
+        txCount: transactions.length,
+        availableAssets: availableAssets,
+        filters: filters
+    })
 
 
 
@@ -42,6 +53,7 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
     const activeFilterCount = useMemo(() => {
         let count = 0
         if (filters.transactionTypes.length > 0) count++
+        if (filters.assetFilter.length > 0) count++
         if (filters.datePreset !== "all") count++
         if (filters.dateFrom) count++
         if (filters.dateTo) count++
@@ -49,10 +61,19 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
     }, [filters])
 
     const handleTypeToggle = (type: ActionType, checked: boolean) => {
+        console.log('[FilterPanel] Type toggle:', type, checked)
         const newTypes = checked
             ? [...filters.transactionTypes, type]
             : filters.transactionTypes.filter(t => t !== type)
         onFiltersChange({ ...filters, transactionTypes: newTypes })
+    }
+
+    const handleAssetToggle = (asset: string, checked: boolean) => {
+        console.log('[FilterPanel] Asset toggle:', asset, checked)
+        const newAssets = checked
+            ? [...filters.assetFilter, asset]
+            : filters.assetFilter.filter(a => a !== asset)
+        onFiltersChange({ ...filters, assetFilter: newAssets })
     }
 
     const handleDatePresetChange = (preset: string) => {
@@ -90,6 +111,7 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
     const handleReset = () => {
         onFiltersChange({
             transactionTypes: [],
+            assetFilter: [],
             datePreset: "all",
             dateFrom: "",
             dateTo: "",
@@ -109,6 +131,20 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
             }
             if (filters.dateTo && tx.date > new Date(filters.dateTo)) {
                 return false
+            }
+            // Asset filter - case-insensitive matching
+            if (filters.assetFilter.length > 0) {
+                const txAssets = [
+                    tx.sentCurrency,
+                    tx.receivedCurrency,
+                    tx.feeCurrency
+                ].filter(Boolean) as string[]
+                const hasMatchingAsset = txAssets.some(asset =>
+                    filters.assetFilter.some(filterAsset =>
+                        filterAsset.toLowerCase() === asset?.toLowerCase()
+                    )
+                )
+                if (!hasMatchingAsset) return false
             }
             return true
         }).length
@@ -144,7 +180,7 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
                     <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
                 {showDateDropdown && (
-                    <div className="absolute top-full left-0 mt-1 z-10 w-64 bg-popover border rounded-lg shadow-lg p-3">
+                    <div className="absolute top-full left-0 mt-1 z-10 w-64 bg-popover border rounded-lg shadow-lg p-3 transition-all duration-200 animate-in fade-in slide-in-from-top-2">
                         {filters.datePreset !== 'custom' ? (
                             <>
                                 {DATE_PRESETS.map((preset) => (
@@ -238,7 +274,7 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
                     <ChevronDown className="h-4 w-4 ml-2" />
                 </Button>
                 {showTypeDropdown && (
-                    <div className="absolute top-full left-0 mt-1 z-10 w-56 bg-popover border rounded-md shadow-lg">
+                    <div className="absolute top-full left-0 mt-1 z-10 w-56 bg-popover border rounded-md shadow-lg transition-all duration-200 animate-in fade-in slide-in-from-top-2">
                         <div className="p-2">
                             {TRANSACTION_TYPE_OPTIONS.map((option) => (
                                 <label
@@ -258,6 +294,51 @@ export function FilterPanel({ transactions, filters, onFiltersChange }: FilterPa
                     </div>
                 )}
             </div>
+
+            {/* Asset Dropdown */}
+            {availableAssets.length > 0 && (
+                <div className="relative">
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            setShowAssetDropdown(!showAssetDropdown)
+                            setShowTypeDropdown(false)
+                            setShowDateDropdown(false)
+                        }}
+                        className={cn(
+                            "h-9 justify-between min-w-[140px]",
+                            filters.assetFilter.length > 0 && "border-primary/50 text-primary"
+                        )}
+                    >
+                        <span className={cn(filters.assetFilter.length > 0 && "text-primary")}>
+                            {filters.assetFilter.length === 0
+                                ? "All Assets"
+                                : `${filters.assetFilter.length} selected`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                    </Button>
+                    {showAssetDropdown && (
+                        <div className="absolute top-full left-0 mt-1 z-10 w-56 bg-popover border rounded-md shadow-lg transition-all duration-200 animate-in fade-in slide-in-from-top-2">
+                            <div className="p-2">
+                                {availableAssets.map((asset) => (
+                                    <label
+                                        key={asset}
+                                        className="flex items-center gap-2 p-2 rounded hover:bg-muted cursor-pointer transition-colors"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.assetFilter.includes(asset)}
+                                            onChange={(e) => handleAssetToggle(asset, e.target.checked)}
+                                            className="rounded border-gray-300"
+                                        />
+                                        <span className="text-sm">{asset}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Reset Button */}
             {activeFilterCount > 0 && (
@@ -288,22 +369,55 @@ export function applyFilters(
     transactions: ParsedTransaction[],
     filters: FilterState
 ): ParsedTransaction[] {
-    return transactions.filter(tx => {
+    console.log('[applyFilters] Starting filter with:', {
+        txCount: transactions.length,
+        filters: filters,
+        sampleTxTypes: transactions.slice(0, 3).map(tx => ({ id: tx.id?.slice(0, 8), type: tx.type, sentCurrency: tx.sentCurrency, receivedCurrency: tx.receivedCurrency, feeCurrency: tx.feeCurrency }))
+    })
+
+    const result = transactions.filter(tx => {
         // Type filter
         if (filters.transactionTypes.length > 0 && !filters.transactionTypes.includes(tx.type)) {
+            console.log('[applyFilters] Filtered out by type:', tx.type, 'wanted:', filters.transactionTypes)
             return false
         }
         // Date filter
         if (filters.dateFrom) {
             const fromDate = new Date(filters.dateFrom)
             fromDate.setHours(0, 0, 0, 0)
-            if (tx.date < fromDate) return false
+            if (tx.date < fromDate) {
+                console.log('[applyFilters] Filtered out by dateFrom:', tx.date, '<', fromDate)
+                return false
+            }
         }
         if (filters.dateTo) {
             const toDate = new Date(filters.dateTo)
             toDate.setHours(23, 59, 59, 999)
-            if (tx.date > toDate) return false
+            if (tx.date > toDate) {
+                console.log('[applyFilters] Filtered out by dateTo:', tx.date, '>', toDate)
+                return false
+            }
+        }
+        // Asset filter - case-insensitive matching
+        if (filters.assetFilter.length > 0) {
+            const txAssets = [
+                tx.sentCurrency,
+                tx.receivedCurrency,
+                tx.feeCurrency
+            ].filter(Boolean) as string[]
+            const hasMatchingAsset = txAssets.some(asset =>
+                filters.assetFilter.some(filterAsset =>
+                    filterAsset.toLowerCase() === asset?.toLowerCase()
+                )
+            )
+            if (!hasMatchingAsset) {
+                console.log('[applyFilters] Filtered out by asset:', txAssets, 'wanted:', filters.assetFilter)
+                return false
+            }
         }
         return true
     })
+
+    console.log('[applyFilters] Result:', result.length, 'of', transactions.length, 'transactions')
+    return result
 }

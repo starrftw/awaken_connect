@@ -16,12 +16,10 @@ export async function fetchCreditcoinTransactions(address: string): Promise<Pars
     }
 
     const transactions = json.result || [];
-    // Blockscout returns oldest last usually, but we sort in UI.
-
-    return transactions.map((tx: any) => parseCreditcoinTransaction(tx, address));
+    return transactions.map((tx: any, index: number) => parseCreditcoinTransaction(tx, address, index));
 }
 
-function parseCreditcoinTransaction(tx: any, userAddress: string): ParsedTransaction {
+function parseCreditcoinTransaction(tx: any, userAddress: string, index: number): ParsedTransaction {
     const isSender = tx.from.toLowerCase() === userAddress.toLowerCase();
     const decimals = 18; // CTC is 18 decimals
 
@@ -51,7 +49,7 @@ function parseCreditcoinTransaction(tx: any, userAddress: string): ParsedTransac
     }
 
     return {
-        id: tx.hash,
+        id: `${tx.hash}_${index}`,
         date: new Date(parseInt(tx.timeStamp) * 1000),
         receivedQuantity: isSender ? "" : valueStr,
         receivedCurrency: isSender ? "" : "CTC",

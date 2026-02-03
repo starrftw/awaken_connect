@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import {
     ArrowUpDown,
     ArrowUp,
@@ -34,7 +34,17 @@ interface SortConfig {
 export function TransactionTable({ data, selectedIds, onSelectionChange }: TransactionTableProps) {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'date', order: 'desc' })
     const [currentPage, setCurrentPage] = useState(1)
-    const itemsPerPage = 10
+    const ITEMS_PER_PAGE = 20;
+
+    // Reset page to 1 when data changes (e.g. filter applied or network changed)
+    useEffect(() => {
+        setCurrentPage(1)
+    }, [data])
+
+    // Handle page change
+    const handlePageChange = useCallback((page: number) => {
+        setCurrentPage(page)
+    }, [])
 
     // Toggle sort - immediate response, no debounce
     const handleSort = useCallback((field: SortField) => {
@@ -47,25 +57,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
         setCurrentPage(1)
     }, [])
 
-    // Selection helpers - using useCallback for stability
-    const handleSelectAll = useCallback((checked: boolean) => {
-        if (checked) {
-            // Select all currently displayed transactions
-            onSelectionChange(data.map(tx => tx.id))
-        } else {
-            onSelectionChange([])
-        }
-    }, [data, onSelectionChange])
-
-    const handleSelectOne = useCallback((id: string, checked: boolean) => {
-        if (checked) {
-            onSelectionChange([...selectedIds, id])
-        } else {
-            onSelectionChange(selectedIds.filter(selectedId => selectedId !== id))
-        }
-    }, [selectedIds, onSelectionChange])
-
-    // Derived Data - sorted
+    // Derived Data - sorted (defined before callbacks that depend on it)
     const sortedData = useMemo(() => {
         return [...data].sort((a, b) => {
             let cmp = 0
@@ -99,17 +91,50 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
         })
     }, [data, sortConfig])
 
+    const handleSelectOne = useCallback((id: string, checked: boolean) => {
+        if (checked) {
+            onSelectionChange([...selectedIds, id])
+        } else {
+            onSelectionChange(selectedIds.filter(selectedId => selectedId !== id))
+        }
+    }, [selectedIds, onSelectionChange])
+
     // Paginated data
     const paginatedData = useMemo(() => {
-        const start = (currentPage - 1) * itemsPerPage
-        return sortedData.slice(start, start + itemsPerPage)
+        const start = (currentPage - 1) * ITEMS_PER_PAGE
+        const result = sortedData.slice(start, start + ITEMS_PER_PAGE)
+        console.log('[TransactionTable] Pagination:', {
+            totalItems: sortedData.length,
+            itemsPerPage: ITEMS_PER_PAGE,
+            currentPage,
+            showingStart: start + 1,
+            showingEnd: Math.min(start + ITEMS_PER_PAGE, sortedData.length),
+            displayedCount: result.length
+        })
+        return result
     }, [sortedData, currentPage])
 
-    const totalPages = Math.ceil(data.length / itemsPerPage)
+    // Selection helpers - using useCallback for stability
 
-    // Checkbox state - only check if ALL displayed items are selected
-    const allSelected = data.length > 0 && paginatedData.length > 0 && paginatedData.every(tx => selectedIds.includes(tx.id))
-    const someSelected = paginatedData.some(tx => selectedIds.includes(tx.id)) && !allSelected
+    const handleSelectAll = useCallback((checked: boolean) => {
+        if (checked) {
+            // Select all filtered transactions (all pages)
+            onSelectionChange(data.map(tx => tx.id))
+        } else {
+            // Deselect all
+            onSelectionChange([])
+        }
+    }, [data, onSelectionChange])
+
+    const totalPages = Math.ceil(sortedData.length / ITEMS_PER_PAGE)
+
+    // Calculate showing range
+    const showingStart = (currentPage - 1) * ITEMS_PER_PAGE + 1
+    const showingEnd = Math.min(currentPage * ITEMS_PER_PAGE, sortedData.length)
+
+    // Checkbox state - check if ALL data items are selected
+    const allSelected = data.length > 0 && data.every(tx => selectedIds.includes(tx.id))
+    const someSelected = selectedIds.length > 0 && !allSelected
 
     // Sort indicator component
     const SortIndicator = ({ field }: { field: SortField }) => {
@@ -206,6 +231,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                     key={tx.id}
                                     className="
                                         border-b border-border/50
+                                        transition-colors duration-150
                                         hover:bg-muted/40
                                         data-[state=selected]:bg-primary/5
                                     "
@@ -301,13 +327,16 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                     <span className="font-medium text-foreground">{selectedIds.length}</span>
                     {" "}of {data.length} row(s) selected
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                        {showingStart}-{showingEnd} of {sortedData.length}
+                    </span>
                     <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                         disabled={currentPage === 1}
-                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 disabled:opacity-50"
+                        className="h-8 px-3 text-xs transition-all duration-200 ease-in-out hover:scale-[1.02] hover:bg-primary/10 hover:text-primary hover:border-primary/30 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
                     >
                         Previous
                     </Button>
@@ -328,8 +357,8 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                     key={pageNum}
                                     variant={currentPage === pageNum ? "default" : "ghost"}
                                     size="icon"
-                                    onClick={() => setCurrentPage(pageNum)}
-                                    className="h-8 w-8 text-xs"
+                                    onClick={() => handlePageChange(pageNum)}
+                                    className="h-8 w-8 text-xs transition-all duration-200 ease-in-out hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                     {pageNum}
                                 </Button>
@@ -341,7 +370,7 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                         size="sm"
                         onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages || totalPages === 0}
-                        className="h-8 px-3 text-xs hover:bg-primary/10 hover:text-primary hover:border-primary/30 disabled:opacity-50"
+                        className="h-8 px-3 text-xs transition-all duration-200 ease-in-out hover:scale-[1.02] hover:bg-primary/10 hover:text-primary hover:border-primary/30 active:scale-[0.98] disabled:opacity-50 disabled:hover:scale-100"
                     >
                         Next
                     </Button>
