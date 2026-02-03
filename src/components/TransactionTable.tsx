@@ -208,13 +208,13 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                 <SortableHeader field="type" className="w-[140px]">
                                     Type
                                 </SortableHeader>
-                                <SortableHeader field="asset">
+                                <SortableHeader field="asset" className="w-[100px]">
                                     Asset
                                 </SortableHeader>
-                                <SortableHeader field="amount">
+                                <SortableHeader field="amount" className="w-[140px] min-w-[140px] max-w-[140px]">
                                     Amount
                                 </SortableHeader>
-                                <SortableHeader field="fee">
+                                <SortableHeader field="fee" className="w-[120px] min-w-[120px] max-w-[120px]">
                                     Fee
                                 </SortableHeader>
                                 <SortableHeader field="status" className="w-[120px]">
@@ -275,13 +275,13 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                     <td className="p-4 align-middle">
                                         <div className="flex flex-col gap-0.5">
                                             {tx.receivedQuantity && (
-                                                <span className="text-green-600 font-mono text-sm font-medium">
-                                                    +{tx.receivedQuantity}
+                                                <span className="text-green-600 font-mono text-sm font-medium truncate max-w-[130px]" title={tx.receivedQuantity}>
+                                                    +{formatAmount(tx.receivedQuantity)}
                                                 </span>
                                             )}
                                             {tx.sentQuantity && (
-                                                <span className="text-red-600 font-mono text-sm font-medium">
-                                                    -{tx.sentQuantity}
+                                                <span className="text-red-600 font-mono text-sm font-medium truncate max-w-[130px]" title={tx.sentQuantity}>
+                                                    -{formatAmount(tx.sentQuantity)}
                                                 </span>
                                             )}
                                             {!tx.receivedQuantity && !tx.sentQuantity && (
@@ -291,8 +291,8 @@ export function TransactionTable({ data, selectedIds, onSelectionChange }: Trans
                                     </td>
                                     <td className="p-4 align-middle">
                                         {tx.feeAmount ? (
-                                            <span className="text-xs text-muted-foreground font-mono">
-                                                {tx.feeAmount} {tx.feeCurrency}
+                                            <span className="text-xs text-muted-foreground font-mono truncate max-w-[110px]" title={`${tx.feeAmount} ${tx.feeCurrency}`}>
+                                                {formatAmount(tx.feeAmount)} {tx.feeCurrency}
                                             </span>
                                         ) : (
                                             <span className="text-xs text-muted-foreground">-</span>
@@ -388,6 +388,23 @@ function formatDateDisplay(d: Date) {
         hour: '2-digit',
         minute: '2-digit'
     })
+}
+
+function formatAmount(value: string | undefined): string {
+    if (!value) return '-'
+    const num = parseFloat(value)
+    if (isNaN(num)) return value
+
+    // Use scientific notation for very small (< 0.00001) or very large (>= 1e9) numbers
+    if (Math.abs(num) < 0.00001 && num !== 0) {
+        return num.toExponential(4).replace('e+', 'E')
+    }
+    if (Math.abs(num) >= 1e9) {
+        return num.toExponential(4).replace('e+', 'E')
+    }
+
+    // For normal numbers, use up to 6 decimal places max, remove trailing zeros
+    return num.toFixed(6).replace(/\.?0+$/, '')
 }
 
 function getActionIcon(type: ActionType) {
