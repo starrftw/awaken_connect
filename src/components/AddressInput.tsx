@@ -3,6 +3,7 @@ import { Search, Wallet, AlertCircle, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import type { Network } from "./NetworkSelector"
+import { validateKaspaAddress } from "../adapters/kaspa"
 
 interface AddressInputProps {
     network: Network
@@ -40,6 +41,13 @@ const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
         description: "Mobile-first EVM-compatible blockchain",
         validate: (addr: string) => /^0x[a-fA-F0-9]{40}$/.test(addr),
         example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    },
+    kaspa: {
+        label: "Kaspa",
+        placeholder: "Enter Kaspa address (kaspa:q...)",
+        description: "Fast, proof-of-work DAG blockchain",
+        validate: (addr: string) => validateKaspaAddress(addr),
+        example: "kaspa:qz8ft2tjn4dr2p0q74lmw4np4f7xq7v8y0z9x3c2b1a4e5d6f7g8h9i0j"
     }
 }
 

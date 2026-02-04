@@ -3,6 +3,7 @@ import { useState, useMemo } from "react"
 import { fetchCreditcoinTransactions } from "./adapters/creditcoin"
 import { fetchHumanityTransactions } from "./adapters/humanity"
 import { fetchCeloTransactions } from "./adapters/celo"
+import { fetchKaspaTransactions } from "./adapters/kaspa"
 import { type ParsedTransaction, downloadCSV } from "./utils/csv"
 import { NetworkSelector, type Network } from "./components/NetworkSelector"
 import { AddressInput } from "./components/AddressInput"
@@ -118,6 +119,8 @@ export default function App() {
                 data = await fetchHumanityTransactions(address)
             } else if (network === 'celo') {
                 data = await fetchCeloTransactions(address, { isTestnet: false })
+            } else if (network === 'kaspa') {
+                data = await fetchKaspaTransactions(address)
             }
 
             if (data.length === 0) {

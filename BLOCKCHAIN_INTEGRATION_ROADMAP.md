@@ -2,10 +2,10 @@
 
 ## Awaken Connect - Multi-Chain Expansion Strategy
 
-**Document Version:** 2.0  
+**Document Version:** 3.0  
 **Created:** 2026-02-03  
-**Last Updated:** 2026-02-03  
-**Status:** Planning Complete
+**Last Updated:** 2026-02-04  
+**Status:** Active Development
 
 ---
 
@@ -374,21 +374,177 @@ describe('Sonium Adapter', () => {
 
 ## Queue-Based Expansion Plan
 
-### Queue Position 4: Soneium (Sony Chain)
+### Priority Integration
 
-**Estimated Integration Time:** 4-5 days  
-**Status:** Next Priority
+#### Kaspa ([https://kaspa.org/](https://kaspa.org/))
 
-Soneium is Sony's Ethereum L2 with strong gaming/NFT ecosystem integration. Key considerations:
+**Estimated Integration Time:** 5-6 days  
+**Status:** In Progress
 
-1. **EVM Compatibility:** Can reuse Celo adapter pattern directly
-2. **Blockscout Explorer:** Likely available for transaction indexing
-3. **Sony Ecosystem:** Identify Sony-specific tokens and operations
-4. **Bridge Operations:** L2 bridge transactions
+Kaspa is a fast, proof-of-work Layer 1 blockchain with high throughput. Key considerations:
+
+1. **DAG-based Architecture:** Requires specialized transaction indexing
+2. **Rust-based Node:** KRC (Kaspa RPC) for transaction data
+3. **Native Asset:** KAS with 8 decimals
+4. **Explorer API:** Kaspa explorer for address transactions
 
 ---
 
-### Queue Position 5: Kala
+### Integration Queue
+
+The following blockchains are planned for integration in order of priority:
+
+#### Fogo
+
+**Estimated Integration Time:** 4-5 days
+
+```typescript
+interface FogoResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Mantle
+
+**Estimated Integration Time:** 4-5 days
+
+```typescript
+interface MantleResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Quai Network
+
+**Estimated Integration Time:** 5-6 days
+
+```typescript
+interface QuaiResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Aleo
+
+**Estimated Integration Time:** 6-7 days
+
+```typescript
+interface AleoResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Hemi Network
+
+**Estimated Integration Time:** 4-5 days
+
+```typescript
+interface HemiResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Morph
+
+**Estimated Integration Time:** 4-5 days
+
+```typescript
+interface MorphResearch {
+    networkType: string;
+    rpcEndpoints: {
+        mainnet: string;
+        testnet?: string;
+    };
+    explorerApi: {
+        baseUrl: string;
+        type: string;
+    };
+    nativeAsset: {
+        symbol: string;
+        decimals: number;
+    };
+    consensusMechanism: string;
+}
+```
+
+---
+
+#### Kala
 
 **Estimated Integration Time:** 3-4 days
 

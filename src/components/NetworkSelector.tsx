@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Check } from "lucide-react"
 
-export type Network = 'creditcoin' | 'humanity' | 'celo'
+export type Network = 'creditcoin' | 'humanity' | 'celo' | 'kaspa'
 
 interface NetworkSelectorProps {
     selected: Network
@@ -31,6 +31,11 @@ const NETWORKS: NetworkOption[] = [
         id: 'celo',
         name: 'Celo',
         logo: '/celo-logo.svg'
+    },
+    {
+        id: 'kaspa',
+        name: 'Kaspa',
+        logo: '/kaspa-logo.svg'
     }
 ]
 
