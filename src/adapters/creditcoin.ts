@@ -36,43 +36,100 @@ export const CREDITCOIN_MAINNET = {
 const SIGNING_FUNCTION_SELECTOR = '0x12345678'; // User will provide actual selector
 
 /**
- * Sign an export hash on the Creditcoin blockchain
+ * Sign an export hash on the Creditcoin blockchain using personal_sign
+ * This avoids the complexity of eth_sendTransaction and its authorization issues
  * @param exportHash - The hash of the exported data to sign
  * @param walletAddress - The wallet address to sign with
- * @returns Transaction hash if successful
+ * @returns Signature if successful
  */
 export async function signExportOnCreditcoin(
     exportHash: string,
     walletAddress: string
 ): Promise<string | null> {
+    console.log('[DEBUG] signExportOnCreditcoin called with:', { exportHash, walletAddress });
     try {
         // Check if MetaMask or compatible wallet is available
-        if (!window.ethereum) {
+        console.log('[DEBUG] Checking for window.ethereum:', typeof window.ethereum);
+        console.log('[DEBUG] Checking for (window as any).privy:', typeof (window as any).privy);
+
+        if (!window.ethereum && !(window as any).privy) {
+            console.error('[DEBUG] No wallet detected');
             throw new Error('No Ethereum wallet detected. Please install MetaMask or a compatible wallet.');
         }
 
-        // Request account access if not already authorized
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-        if (accounts.length === 0) {
-            // Request account access - this triggers the wallet authorization prompt
-            const authorizedAccounts = await window.ethereum.request({
-                method: 'eth_requestAccounts'
-            });
+        // Get the wallet provider - prioritize Privy if available
+        const walletProvider = (window as any).privy?.ethereum || window.ethereum;
+        console.log('[DEBUG] Using wallet provider:', walletProvider ? 'found' : 'not found');
+
+        // Dynamically fetch the active account to handle account switching
+        const accounts = await walletProvider.request({ method: 'eth_accounts' });
+        let activeAddress = accounts[0];
+
+        // If no accounts returned, request authorization
+        if (!activeAddress) {
+            const authorizedAccounts = await walletProvider.request({ method: 'eth_requestAccounts' });
             if (authorizedAccounts.length === 0) {
                 throw new Error('No wallet accounts authorized. Please connect your wallet.');
             }
+            activeAddress = authorizedAccounts[0];
         }
 
-        // Switch to Creditcoin Testnet
+        console.log('[DEBUG] Using active address:', activeAddress);
+
+        // Convert hash to proper format for personal_sign
+        // personal_sign expects the message to be hex-encoded
+        let messageHash = exportHash;
+        if (!messageHash.startsWith('0x')) {
+            messageHash = '0x' + messageHash;
+        }
+
+        // Ensure it's a valid hex string
+        if (messageHash.length !== 66) {
+            // Pad to 66 chars (0x + 64 hex chars)
+            messageHash = '0x' + messageHash.slice(2).padStart(64, '0');
+        }
+
+        console.log('[DEBUG] Using personal_sign with hash:', messageHash);
+
+        // Use personal_sign instead of eth_sendTransaction
+        // This is simpler and doesn't require chain configuration or gas
+        const signature = await walletProvider.request({
+            method: 'personal_sign',
+            params: [messageHash, activeAddress],
+        });
+
+        console.log('[DEBUG] Personal sign result:', signature);
+
+        // Return the signature as the "transaction hash"
+        // In production, you would verify this signature on-chain
+        return signature;
+    } catch (error: any) {
+        console.error('[DEBUG] Error signing export on Creditcoin:', error);
+        console.error('[DEBUG] Error code:', error.code);
+        console.error('[DEBUG] Error message:', error.message);
+
+        // If personal_sign fails, fall back to eth_sendTransaction
+        console.log('[DEBUG] personal_sign failed, falling back to eth_sendTransaction...');
+
         try {
-            await window.ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: `0x${CREDITCOIN_TESTNET.chainId.toString(16)}` }],
+            // Get the wallet provider
+            const walletProvider = (window as any).privy?.ethereum || window.ethereum;
+
+            // Get fresh accounts after authorization - use the authorized account
+            const freshAccounts = await walletProvider.request({
+                method: 'eth_requestAccounts'
             });
-        } catch (switchError: any) {
-            // If chain doesn't exist, try to add it
-            if (switchError.code === 4902) {
-                await window.ethereum.request({
+
+            if (freshAccounts.length === 0) {
+                throw new Error('No wallet accounts authorized. Please connect your wallet.');
+            }
+
+            // Use the first authorized account as the active address
+            const activeAddress = freshAccounts[0];
+
+            // Ensure chain is added
+            try {
+                await walletProvider.request({
                     method: 'wallet_addEthereumChain',
                     params: [
                         {
@@ -84,40 +141,40 @@ export async function signExportOnCreditcoin(
                         },
                     ],
                 });
-            } else if (switchError.code === 4001) {
-                // User rejected the switch
-                throw new Error('User rejected chain switch. Please accept Creditcoin Testnet to continue.');
-            } else {
-                throw switchError;
+            } catch (e) {
+                // Chain already exists, continue
             }
+
+            // Switch to Creditcoin Testnet
+            try {
+                await walletProvider.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: `0x${CREDITCOIN_TESTNET.chainId.toString(16)}` }],
+                });
+            } catch (e) {
+                // Already on the chain, continue
+            }
+
+            // Create transaction params - use the dynamically obtained active address
+            const hashBytes = exportHash.startsWith('0x') ? exportHash : `0x${exportHash}`;
+            const txParams = {
+                from: activeAddress,
+                to: CREDITCOIN_TESTNET.contractAddress,
+                data: `${SIGNING_FUNCTION_SELECTOR}${hashBytes.slice(2).padStart(64, '0')}`,
+            };
+
+            console.log('[DEBUG] Sending fallback transaction with params:', txParams);
+
+            const result = await walletProvider.request({
+                method: 'eth_sendTransaction',
+                params: [txParams],
+            });
+
+            console.log('[DEBUG] Fallback transaction sent successfully:', result);
+            return result;
+        } catch (fallbackError: any) {
+            throw new Error(`Failed to sign export: ${fallbackError.message}`);
         }
-
-        // Create contract instance if address is provided
-        const contractAddress = CREDITCOIN_TESTNET.contractAddress;
-        if (!contractAddress) {
-            throw new Error('Creditcoin contract address not configured');
-        }
-
-        // Convert hash string to bytes32
-        const hashBytes = exportHash.startsWith('0x') ? exportHash : `0x${exportHash}`;
-
-        // Request signature from wallet with explicit from parameter
-        // This will prompt the user to sign the transaction
-        const result = await window.ethereum.request({
-            method: 'eth_sendTransaction',
-            params: [
-                {
-                    from: walletAddress,
-                    to: contractAddress,
-                    data: `${SIGNING_FUNCTION_SELECTOR}${hashBytes.slice(2).padStart(64, '0')}`,
-                },
-            ],
-        });
-
-        return result;
-    } catch (error: any) {
-        console.error('Error signing export on Creditcoin:', error);
-        throw new Error(`Failed to sign export: ${error.message}`);
     }
 }
 

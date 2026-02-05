@@ -343,30 +343,41 @@ function MainContent() {
     }
 
     const handleVerifyAndDownload = async () => {
-        if (!pendingExportData) return
+        if (!pendingExportData) {
+            console.log('[DEBUG] No pending export data');
+            return;
+        }
 
         setVerifyPopupLoading(true)
         setVerifyPopupError(null)
 
         try {
             // Check if user is authenticated with Privy
+            console.log('[DEBUG] Checking user authentication...', { user });
             if (!user) {
                 throw new Error('Please sign in with Privy to verify exports on the blockchain.');
             }
 
             // Check if wallet is connected by checking for Ethereum provider
+            console.log('[DEBUG] Checking wallet providers...', {
+                hasEthereum: !!window.ethereum,
+                hasPrivy: !!(window as any).privy
+            });
             if (!window.ethereum && !(window as any).privy) {
                 throw new Error('No wallet detected. Please connect a wallet through Privy or install MetaMask.');
             }
 
             // Generate export hash
+            console.log('[DEBUG] Generating export hash for', pendingExportData.transactions.length, 'transactions');
             const exportHash = generateExportHash(
                 pendingExportData.transactions,
                 network,
                 currentAddress
             )
+            console.log('[DEBUG] Generated export hash:', exportHash);
 
             // Sign the export on Creditcoin
+            console.log('[DEBUG] Calling signExportOnCreditcoin...');
             const txHash = await signExportOnCreditcoin(exportHash, currentAddress)
 
             // Perform export with signing info
@@ -374,6 +385,7 @@ function MainContent() {
         } catch (err: any) {
             // Check if error suggests user needs to authorize wallet
             const errorMessage = err.message || 'Failed to sign export';
+            console.error('[DEBUG] Verification error:', errorMessage);
             if (errorMessage.includes('not been authorized') || errorMessage.includes('account') || errorMessage.includes('wallet')) {
                 setVerifyPopupError(`${errorMessage} Please check your wallet extension and try again.`);
             } else {
