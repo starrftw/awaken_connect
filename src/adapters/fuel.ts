@@ -75,8 +75,8 @@ export async function fetchFuelTransactions(address: string, isTestnet = false):
   }
 
   while (hasNextPage) {
-    const variables = { address, first: 30, after: endCursor };
-    const response = await fetch(endpoint, {
+    const variables: { address: string; first: number; after: string | null } = { address, first: 30, after: endCursor };
+    const response: Response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: TRANSACTIONS_QUERY, variables })
@@ -84,13 +84,13 @@ export async function fetchFuelTransactions(address: string, isTestnet = false):
 
     if (!response.ok) throw new Error(`Fuel API Error: ${response.statusText}`);
 
-    const result = await response.json();
+    const result: { data?: { transactionsByOwner?: { nodes: any[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } } }; errors?: any[] } = await response.json();
     if (result.errors) {
       // Attempt fallback or report specific error
       throw new Error(`Fuel GraphQL Error: ${result.errors[0].message}`);
     }
 
-    const data = result.data.transactionsByOwner;
+    const data = result.data?.transactionsByOwner;
     if (!data) break;
 
     allNodes = [...allNodes, ...data.nodes];

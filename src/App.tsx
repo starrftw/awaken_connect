@@ -1,9 +1,12 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom"
+import { PrivyProvider, usePrivy } from '@privy-io/react-auth'
 
-import { fetchCreditcoinTransactions } from "./adapters/creditcoin"
+import { fetchCreditcoinTransactions, signExportOnCreditcoin, generateExportHash } from "./adapters/creditcoin"
 import { fetchHumanityTransactions } from "./adapters/humanity"
 import { fetchCeloTransactions } from "./adapters/celo"
 import { fetchKaspaTransactions } from "./adapters/kaspa"
+import { fetchFuelTransactions } from "./adapters/fuel"
 import { type ParsedTransaction, downloadCSV } from "./utils/csv"
 import { NetworkSelector, type Network } from "./components/NetworkSelector"
 import { AddressInput } from "./components/AddressInput"
@@ -12,12 +15,166 @@ import { FilterPanel, type FilterState, applyFilters } from "./components/Filter
 import { SearchBar } from "./components/SearchBar"
 import { SkeletonTable } from "./components/SkeletonTable"
 import { Footer } from "./components/Footer"
+import { VerifyExportPopup } from "./components/VerifyExportPopup"
 import { Button } from "./components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
 import { Badge } from "./components/ui/badge"
-import { Download, FileSpreadsheet, Link2Off, Infinity, Lock } from "lucide-react"
+import { Download, FileSpreadsheet, Link2Off, Infinity, Lock, User, Menu, X } from "lucide-react"
+import { PRIVY_CONFIG } from "./lib/privy"
+import { db } from "./lib/supabase"
+import { generateUsername } from "./lib/utils"
+import ProfileDashboard from "./pages/ProfileDashboard"
 
-export default function App() {
+// Track previous authentication state to avoid duplicate calls
+let previousAuthState: boolean | null = null
+
+// Auth handler component to manage login events
+function AuthHandler({ children }: { children: React.ReactNode }) {
+    const { ready, authenticated, user } = usePrivy()
+
+    // Handle authentication success and profile creation
+    useEffect(() => {
+        if (ready && authenticated && user?.id) {
+            // Only run when transitioning from unauthenticated to authenticated
+            if (previousAuthState === false || previousAuthState === null) {
+                handleAuthSuccess()
+            }
+        } else if (ready && !authenticated) {
+            previousAuthState = false
+        }
+    }, [ready, authenticated, user])
+
+    const handleAuthSuccess = async () => {
+        if (!user?.id) return
+
+        previousAuthState = true
+
+        try {
+            // Check if profile exists
+            const existingProfile = await db.getProfile(user.id)
+
+            if (!existingProfile) {
+                // Create new profile with generated username
+                const newUsername = generateUsername()
+                await db.createProfile(user.id, user.email?.address)
+                await db.updateProfile(user.id, { username: newUsername })
+            }
+        } catch (error) {
+            console.error('Error handling auth success:', error)
+        }
+    }
+
+    return <>{children}</>
+}
+
+// Navigation component
+function Navigation() {
+    const { ready, authenticated, login } = usePrivy()
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+    const location = useLocation()
+
+    const isProfilePage = location.pathname === '/profile'
+
+    const handleLogin = async () => {
+        try {
+            await login()
+        } catch (error) {
+            console.error('Login error:', error)
+        }
+    }
+
+    return (
+        <nav className="border-b border-border/50 bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+            <div className="mx-auto max-w-6xl px-4 sm:px-8">
+                <div className="flex h-16 items-center justify-between">
+                    <div className="flex items-center gap-6">
+                        <Link to="/" className="flex items-center gap-2">
+                            <div className="rounded-lg bg-gradient-to-br from-primary to-primary/80 p-2">
+                                <FileSpreadsheet className="h-5 w-5 text-primary-foreground" />
+                            </div>
+                            <span className="font-bold text-lg hidden sm:inline">Awaken Connect</span>
+                        </Link>
+
+                        {/* Desktop Navigation */}
+                        <div className="hidden md:flex items-center gap-4">
+                            <Link
+                                to="/"
+                                className={`text-sm font-medium transition-colors ${!isProfilePage ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+                                    }`}
+                            >
+                                Explorer
+                            </Link>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        {/* Auth Button - Desktop */}
+                        <div className="hidden sm:flex items-center gap-2">
+                            {ready && authenticated ? (
+                                <Link to="/profile">
+                                    <Button variant="outline" size="sm" className="gap-2">
+                                        <User className="h-4 w-4" />
+                                        Profile
+                                    </Button>
+                                </Link>
+                            ) : ready ? (
+                                <Button onClick={handleLogin} size="sm">
+                                    Sign In
+                                </Button>
+                            ) : null}
+                        </div>
+
+                        {/* Mobile Menu Button */}
+                        <button
+                            className="md:hidden p-2"
+                            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        >
+                            {mobileMenuOpen ? (
+                                <X className="h-5 w-5" />
+                            ) : (
+                                <Menu className="h-5 w-5" />
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Mobile Menu */}
+                {mobileMenuOpen && (
+                    <div className="md:hidden py-4 border-t border-border/50">
+                        <div className="flex flex-col gap-3">
+                            <Link
+                                to="/"
+                                className={`text-sm font-medium px-3 py-2 rounded-lg ${!isProfilePage ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                                    }`}
+                                onClick={() => setMobileMenuOpen(false)}
+                            >
+                                Explorer
+                            </Link>
+                            {ready && authenticated ? (
+                                <Link
+                                    to="/profile"
+                                    className={`text-sm font-medium px-3 py-2 rounded-lg ${isProfilePage ? 'bg-primary/10 text-primary' : 'hover:bg-muted'
+                                        }`}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                >
+                                    Profile
+                                </Link>
+                            ) : null}
+                            {!ready ? (
+                                <Button onClick={handleLogin} className="w-full">
+                                    Sign In
+                                </Button>
+                            ) : null}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </nav>
+    )
+}
+
+function MainContent() {
+    const { user } = usePrivy()
     const [network, setNetwork] = useState<Network>('creditcoin')
     const [transactions, setTransactions] = useState<ParsedTransaction[]>([])
     const [searchQuery, setSearchQuery] = useState("")
@@ -32,6 +189,15 @@ export default function App() {
         dateFrom: "",
         dateTo: "",
     })
+
+    // Creditcoin signing popup state
+    const [showVerifyPopup, setShowVerifyPopup] = useState(false)
+    const [verifyPopupLoading, setVerifyPopupLoading] = useState(false)
+    const [verifyPopupError, setVerifyPopupError] = useState<string | null>(null)
+    const [pendingExportData, setPendingExportData] = useState<{
+        onlySelected: boolean
+        transactions: ParsedTransaction[]
+    } | null>(null)
 
     // Extract unique assets from all transactions
     const availableAssets = useMemo(() => {
@@ -69,26 +235,14 @@ export default function App() {
         // 2. Apply Filters
         result = applyFilters(result, filters)
 
-        console.log('[App] Pipeline:', {
-            original: transactions.length,
-            searchQuery: searchQuery,
-            afterSearch: result.length,
-            filters: filters
-        })
-
         return result
     }, [transactions, searchQuery, filters])
 
     const handleNetworkChange = (n: Network) => {
-        console.log('[App] Network changing from', network, 'to', n)
-        console.log('[App] Current address before reset:', currentAddress)
         setNetwork(n)
         setTransactions([])
         setSearchQuery("")
         setSelectedIds([])
-        // FIX: Don't reset address here - let user keep it when switching networks
-        // setCurrentAddress("")
-        console.log('[App] Address preserved:', currentAddress)
         setFilters({
             transactionTypes: [],
             assetFilter: [],
@@ -113,14 +267,16 @@ export default function App() {
 
         try {
             let data: ParsedTransaction[] = []
-            if (network === 'creditcoin') {
-                data = await fetchCreditcoinTransactions(address)
+            if (network === 'creditcoin' || network === 'creditcoin-testnet') {
+                data = await fetchCreditcoinTransactions(address, network === 'creditcoin-testnet')
             } else if (network === 'humanity') {
                 data = await fetchHumanityTransactions(address)
             } else if (network === 'celo') {
                 data = await fetchCeloTransactions(address, { isTestnet: false })
             } else if (network === 'kaspa') {
                 data = await fetchKaspaTransactions(address)
+            } else if (network === 'fuel') {
+                data = await fetchFuelTransactions(address, false)
             }
 
             if (data.length === 0) {
@@ -135,7 +291,7 @@ export default function App() {
         }
     }
 
-    const handleExport = (onlySelected: boolean) => {
+    const handleExport = async (onlySelected: boolean) => {
         const dataToExport = onlySelected
             ? displayedTransactions.filter(tx => selectedIds.includes(tx.id))
             : displayedTransactions
@@ -145,9 +301,92 @@ export default function App() {
             return
         }
 
+        // Show popup for Creditcoin Testnet blockchain (not mainnet)
+        if (network === 'creditcoin-testnet') {
+            setPendingExportData({ onlySelected, transactions: dataToExport })
+            setShowVerifyPopup(true)
+            setVerifyPopupError(null)
+            return
+        }
+
+        // For other blockchains, download directly
+        await performExport(dataToExport, false, null)
+    }
+
+    const performExport = async (
+        dataToExport: ParsedTransaction[],
+        isSigned: boolean,
+        transactionHash: string | null
+    ) => {
         const filename = `${network}_${currentAddress.slice(0, 6)}_${new Date().toISOString().split('T')[0]}.csv`
         downloadCSV(dataToExport, filename)
+
+        // Track export in Supabase if user is authenticated
+        if (user?.id && currentAddress) {
+            try {
+                await db.addExportHistory(
+                    user.id,
+                    network,
+                    currentAddress,
+                    dataToExport.length,
+                    isSigned,
+                    transactionHash,
+                    isSigned ? new Date().toISOString() : null
+                )
+            } catch (err) {
+                console.error('Error tracking export history:', err)
+            }
+        }
+
         setError(null)
+        setShowVerifyPopup(false)
+    }
+
+    const handleVerifyAndDownload = async () => {
+        if (!pendingExportData) return
+
+        setVerifyPopupLoading(true)
+        setVerifyPopupError(null)
+
+        try {
+            // Check if user is authenticated with Privy
+            if (!user) {
+                throw new Error('Please sign in with Privy to verify exports on the blockchain.');
+            }
+
+            // Check if wallet is connected by checking for Ethereum provider
+            if (!window.ethereum && !(window as any).privy) {
+                throw new Error('No wallet detected. Please connect a wallet through Privy or install MetaMask.');
+            }
+
+            // Generate export hash
+            const exportHash = generateExportHash(
+                pendingExportData.transactions,
+                network,
+                currentAddress
+            )
+
+            // Sign the export on Creditcoin
+            const txHash = await signExportOnCreditcoin(exportHash, currentAddress)
+
+            // Perform export with signing info
+            await performExport(pendingExportData.transactions, true, txHash)
+        } catch (err: any) {
+            // Check if error suggests user needs to authorize wallet
+            const errorMessage = err.message || 'Failed to sign export';
+            if (errorMessage.includes('not been authorized') || errorMessage.includes('account') || errorMessage.includes('wallet')) {
+                setVerifyPopupError(`${errorMessage} Please check your wallet extension and try again.`);
+            } else {
+                setVerifyPopupError(errorMessage);
+            }
+        } finally {
+            setVerifyPopupLoading(false)
+        }
+    }
+
+    const handleDownloadOnly = () => {
+        if (!pendingExportData) return
+        performExport(pendingExportData.transactions, false, null)
     }
 
     const hasTransactions = transactions.length > 0
@@ -192,7 +431,7 @@ export default function App() {
                 </header>
 
                 {/* Configuration Card */}
-                <Card className="border-border/50 shadow-xl shadow-black/5 bg-gradient-to-br from-card to-card/95 backdrop-blur overflow-hidden">
+                <Card className="border-border/50 shadow-xl shadow-black/5 bg-gradient-to-br from-card to-card/95 backdrop-blur">
                     <CardHeader className="pb-4 border-b border-border/50 bg-muted/30">
                         <div className="flex items-center justify-between">
                             <div>
@@ -359,7 +598,17 @@ export default function App() {
                     </Card>
                 )}
 
-
+                {/* Creditcoin Signing Popup */}
+                <VerifyExportPopup
+                    isOpen={showVerifyPopup}
+                    onClose={() => setShowVerifyPopup(false)}
+                    onVerifyAndDownload={handleVerifyAndDownload}
+                    onDownloadOnly={handleDownloadOnly}
+                    blockchain={network}
+                    transactionCount={pendingExportData?.transactions.length || 0}
+                    isLoading={verifyPopupLoading}
+                    error={verifyPopupError}
+                />
 
                 <Footer />
 
@@ -367,3 +616,27 @@ export default function App() {
         </div>
     )
 }
+
+// App wrapper with Privy provider
+function AppWithProviders() {
+    const privyAppId = import.meta.env.VITE_PRIVY_APP_ID
+
+    return (
+        <PrivyProvider
+            appId={privyAppId || 'demo-app-id'}
+            config={PRIVY_CONFIG}
+        >
+            <AuthHandler>
+                <BrowserRouter>
+                    <Navigation />
+                    <Routes>
+                        <Route path="/" element={<MainContent />} />
+                        <Route path="/profile" element={<ProfileDashboard />} />
+                    </Routes>
+                </BrowserRouter>
+            </AuthHandler>
+        </PrivyProvider>
+    )
+}
+
+export default AppWithProviders

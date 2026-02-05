@@ -2,9 +2,166 @@ import { ActionType, type ParsedTransaction, TransactionStatus } from '../utils/
 import { mapToAwakenLabel } from '../utils/awakenLabels';
 
 const API_ENDPOINT = 'https://creditcoin.blockscout.com/api';
+const TESTNET_API_ENDPOINT = 'https://creditcoin-testnet.blockscout.com/api';
 
-export async function fetchCreditcoinTransactions(address: string): Promise<ParsedTransaction[]> {
-    const url = `${API_ENDPOINT}?module=account&action=txlist&address=${address}`;
+// Creditcoin Testnet Configuration
+export const CREDITCOIN_TESTNET = {
+    chainId: 333777,
+    chainName: 'Creditcoin Testnet',
+    rpcUrls: ['https://rpc.cc3-testnet.creditcoin.network'],
+    contractAddress: '0x21E95B92a07B00e7f410Ba170aE17763971D9F60',
+    blockExplorerUrl: 'https://creditcoin-testnet.blockscout.com',
+    nativeCurrency: {
+        name: 'Creditcoin',
+        symbol: 'CTC',
+        decimals: 18,
+    },
+};
+
+// Creditcoin Mainnet Configuration
+export const CREDITCOIN_MAINNET = {
+    chainId: 2031,
+    chainName: 'Creditcoin',
+    rpcUrl: 'https://rpc.creditcoin.org',
+    contractAddress: '0x...',
+    blockExplorerUrl: 'https://creditcoin.blockscout.com',
+    nativeCurrency: {
+        name: 'Creditcoin',
+        symbol: 'CTC',
+        decimals: 18,
+    },
+};
+
+// ABI for signing export hash - function selector for 'signExport(bytes32)'
+const SIGNING_FUNCTION_SELECTOR = '0x12345678'; // User will provide actual selector
+
+/**
+ * Sign an export hash on the Creditcoin blockchain
+ * @param exportHash - The hash of the exported data to sign
+ * @param walletAddress - The wallet address to sign with
+ * @returns Transaction hash if successful
+ */
+export async function signExportOnCreditcoin(
+    exportHash: string,
+    walletAddress: string
+): Promise<string | null> {
+    try {
+        // Check if MetaMask or compatible wallet is available
+        if (!window.ethereum) {
+            throw new Error('No Ethereum wallet detected. Please install MetaMask or a compatible wallet.');
+        }
+
+        // Request account access if not already authorized
+        const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+        if (accounts.length === 0) {
+            // Request account access - this triggers the wallet authorization prompt
+            const authorizedAccounts = await window.ethereum.request({
+                method: 'eth_requestAccounts'
+            });
+            if (authorizedAccounts.length === 0) {
+                throw new Error('No wallet accounts authorized. Please connect your wallet.');
+            }
+        }
+
+        // Switch to Creditcoin Testnet
+        try {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: `0x${CREDITCOIN_TESTNET.chainId.toString(16)}` }],
+            });
+        } catch (switchError: any) {
+            // If chain doesn't exist, try to add it
+            if (switchError.code === 4902) {
+                await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [
+                        {
+                            chainId: `0x${CREDITCOIN_TESTNET.chainId.toString(16)}`,
+                            chainName: CREDITCOIN_TESTNET.chainName,
+                            rpcUrls: CREDITCOIN_TESTNET.rpcUrls,
+                            blockExplorerUrls: [CREDITCOIN_TESTNET.blockExplorerUrl],
+                            nativeCurrency: CREDITCOIN_TESTNET.nativeCurrency,
+                        },
+                    ],
+                });
+            } else if (switchError.code === 4001) {
+                // User rejected the switch
+                throw new Error('User rejected chain switch. Please accept Creditcoin Testnet to continue.');
+            } else {
+                throw switchError;
+            }
+        }
+
+        // Create contract instance if address is provided
+        const contractAddress = CREDITCOIN_TESTNET.contractAddress;
+        if (!contractAddress) {
+            throw new Error('Creditcoin contract address not configured');
+        }
+
+        // Convert hash string to bytes32
+        const hashBytes = exportHash.startsWith('0x') ? exportHash : `0x${exportHash}`;
+
+        // Request signature from wallet with explicit from parameter
+        // This will prompt the user to sign the transaction
+        const result = await window.ethereum.request({
+            method: 'eth_sendTransaction',
+            params: [
+                {
+                    from: walletAddress,
+                    to: contractAddress,
+                    data: `${SIGNING_FUNCTION_SELECTOR}${hashBytes.slice(2).padStart(64, '0')}`,
+                },
+            ],
+        });
+
+        return result;
+    } catch (error: any) {
+        console.error('Error signing export on Creditcoin:', error);
+        throw new Error(`Failed to sign export: ${error.message}`);
+    }
+}
+
+/**
+ * Generate a hash for the export data
+ * @param transactions - The transactions being exported
+ * @param blockchain - The blockchain network
+ * @param walletAddress - The wallet address
+ * @returns A hash string representing the export
+ */
+export function generateExportHash(
+    transactions: ParsedTransaction[],
+    blockchain: string,
+    walletAddress: string
+): string {
+    const exportData = {
+        transactions: transactions.map(tx => ({
+            hash: tx.hash,
+            date: tx.date.toISOString(),
+            amount: tx.sentQuantity || tx.receivedQuantity,
+            type: tx.type,
+        })),
+        blockchain,
+        walletAddress,
+        timestamp: new Date().toISOString(),
+    };
+
+    // Create a simple hash (in production, use a proper cryptographic hash)
+    const dataString = JSON.stringify(exportData);
+    let hash = 0;
+    for (let i = 0; i < dataString.length; i++) {
+        const char = dataString.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+    }
+
+    // Convert to hex string
+    const hashHex = Math.abs(hash).toString(16).padStart(64, '0');
+    return `0x${hashHex}`;
+}
+
+export async function fetchCreditcoinTransactions(address: string, isTestnet: boolean = false): Promise<ParsedTransaction[]> {
+    const endpoint = isTestnet ? TESTNET_API_ENDPOINT : API_ENDPOINT;
+    const url = `${endpoint}?module=account&action=txlist&address=${address}`;
 
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Creditcoin API Error: ${response.statusText}`);

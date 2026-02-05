@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import { ChevronDown, Check } from "lucide-react"
 
-export type Network = 'creditcoin' | 'humanity' | 'celo' | 'kaspa'
+export type Network = 'creditcoin' | 'creditcoin-testnet' | 'humanity' | 'celo' | 'kaspa'
 
 interface NetworkSelectorProps {
     selected: Network
@@ -18,11 +18,6 @@ interface NetworkOption {
 
 const NETWORKS: NetworkOption[] = [
     {
-        id: 'creditcoin',
-        name: 'Creditcoin',
-        logo: '/creditcoin-logo.png'
-    },
-    {
         id: 'humanity',
         name: 'Humanity Protocol',
         logo: '/humanity-logo.avif'
@@ -36,6 +31,16 @@ const NETWORKS: NetworkOption[] = [
         id: 'kaspa',
         name: 'Kaspa',
         logo: '/kaspa-logo.svg'
+    },
+    {
+        id: 'creditcoin',
+        name: 'Creditcoin',
+        logo: '/creditcoin-logo.png'
+    },
+    {
+        id: 'creditcoin-testnet',
+        name: 'Creditcoin Testnet',
+        logo: '/creditcoin-logo.png'
     }
 ]
 
@@ -95,7 +100,7 @@ export function NetworkSelector({ selected, onSelect, disabled }: NetworkSelecto
 
                 {/* Dropdown Menu */}
                 {isOpen && (
-                    <div className="absolute top-full left-0 mt-1 z-20 w-[200px] bg-popover border rounded-lg shadow-lg overflow-hidden transition-all duration-200 animate-in fade-in slide-in-from-top-2">
+                    <div className="absolute top-full left-0 mt-1 z-20 w-[200px] bg-popover border rounded-lg shadow-lg overflow-y-auto max-h-72 transition-all duration-200 animate-in fade-in slide-in-from-top-2">
                         {NETWORKS.map((network) => {
                             const isSelected = selected === network.id
                             return (

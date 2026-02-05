@@ -28,6 +28,13 @@ const NETWORK_CONFIGS: Record<Network, NetworkConfig> = {
         validate: (addr: string) => addr.startsWith('0x') && addr.length === 42,
         example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
     },
+    "creditcoin-testnet": {
+        label: "Creditcoin Testnet",
+        placeholder: "Enter Creditcoin Testnet address (0x...)",
+        description: "Testnet for Creditcoin blockchain",
+        validate: (addr: string) => addr.startsWith('0x') && addr.length === 42,
+        example: "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+    },
     humanity: {
         label: "Humanity Protocol",
         placeholder: "Enter Humanity address (0x...)",
