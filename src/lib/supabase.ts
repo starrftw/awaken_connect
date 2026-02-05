@@ -3,14 +3,19 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-if (!supabaseUrl || !supabaseAnonKey) {
-    console.warn('Supabase environment variables are not set')
-}
-
+// Create a dummy client if environment variables are missing to prevent synchronous crash
+// This allows the app to load even if Supabase is not configured on Vercel yet
 export const supabase = createClient(
-    supabaseUrl || '',
-    supabaseAnonKey || ''
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseAnonKey || 'placeholder-key'
 )
+
+// Helper to check if Supabase is properly configured
+const isConfigured = !!(supabaseUrl && supabaseAnonKey)
+
+if (!isConfigured) {
+    console.warn('Supabase environment variables are missing. Database features will be disabled.')
+}
 
 // Types for Supabase tables
 export interface Profile {
@@ -54,6 +59,8 @@ export interface ExportHistory {
 export const db = {
     // Profiles
     async getProfile(userId: string) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('profiles')
             .select('*')
@@ -67,6 +74,8 @@ export const db = {
     },
 
     async createProfile(userId: string, email?: string) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('profiles')
             .insert({ id: userId, email })
@@ -80,6 +89,8 @@ export const db = {
     },
 
     async updateProfile(userId: string, updates: Partial<Profile>) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('profiles')
             .update(updates)
@@ -95,6 +106,8 @@ export const db = {
 
     // Connected Wallets
     async getConnectedWallets(profileId: string) {
+        if (!isConfigured) return []
+
         const { data, error } = await supabase
             .from('connected_wallets')
             .select('*')
@@ -112,6 +125,8 @@ export const db = {
         walletAddress: string,
         walletType: 'creditcoin' | 'kaspa' | 'other'
     ) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('connected_wallets')
             .insert({
@@ -129,6 +144,8 @@ export const db = {
     },
 
     async removeConnectedWallet(walletId: string) {
+        if (!isConfigured) return false
+
         const { error } = await supabase
             .from('connected_wallets')
             .delete()
@@ -142,6 +159,8 @@ export const db = {
 
     // Request History
     async getRequestHistory(profileId: string, limit = 50) {
+        if (!isConfigured) return []
+
         const { data, error } = await supabase
             .from('requests_history')
             .select('*')
@@ -160,6 +179,8 @@ export const db = {
         requestType: string,
         details: Record<string, unknown>
     ) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('requests_history')
             .insert({
@@ -178,6 +199,8 @@ export const db = {
 
     // Export History
     async getExportHistory(userId: string, limit = 50) {
+        if (!isConfigured) return []
+
         const { data, error } = await supabase
             .from('export_history')
             .select('*')
@@ -200,6 +223,8 @@ export const db = {
         transactionHash: string | null = null,
         signedAt: string | null = null
     ) {
+        if (!isConfigured) return null
+
         const { data, error } = await supabase
             .from('export_history')
             .insert({
